@@ -9,7 +9,7 @@ import java.util.UUID
 
 class WasteRepository {
     private val database = FirebaseDatabase
-        .getInstance("https://civicfix-92e86-default-rtdb.firebaseio.com/")
+        .getInstance("https://civicfix-92e86-default-rtdb.firebaseio.com")
         .getReference("reports")
     private val storage = FirebaseStorage.getInstance()
 

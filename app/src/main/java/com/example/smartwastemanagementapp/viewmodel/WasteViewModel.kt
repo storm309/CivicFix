@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.smartwastemanagementapp.model.WasteReport
 import com.example.smartwastemanagementapp.repository.WasteRepository
 import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -23,15 +24,27 @@ class WasteViewModel(private val repository: WasteRepository = WasteRepository()
     private val _error = mutableStateOf<String?>(null)
     val error: State<String?> = _error
 
+    // Catches any uncaught exception from a coroutine so the app never crashes
+    private val exceptionHandler = CoroutineExceptionHandler { _, throwable ->
+        _isLoading.value = false
+        _error.value = throwable.localizedMessage ?: "An unexpected error occurred"
+    }
+
     init {
         fetchReports()
     }
 
     fun fetchReports() {
-        viewModelScope.launch {
-            _isLoading.value = true
-            _reports.value = repository.getAllReports()
-            _isLoading.value = false
+        viewModelScope.launch(exceptionHandler) {
+            try {
+                _isLoading.value = true
+                _error.value = null
+                _reports.value = repository.getAllReports()
+            } catch (e: Exception) {
+                _error.value = e.localizedMessage ?: "Failed to load reports"
+            } finally {
+                _isLoading.value = false
+            }
         }
     }
 
@@ -43,15 +56,21 @@ class WasteViewModel(private val repository: WasteRepository = WasteRepository()
         onSuccess: () -> Unit
     ) {
         val userId = FirebaseAuth.getInstance().currentUser?.uid ?: "anonymous"
-        viewModelScope.launch {
-            _isLoading.value = true
-            val result = repository.submitReport(description, imageUri, latitude, longitude, userId)
-            _isLoading.value = false
-            if (result.isSuccess) {
-                onSuccess()
-                fetchReports()
-            } else {
-                _error.value = result.exceptionOrNull()?.message ?: "Unknown Error"
+        viewModelScope.launch(exceptionHandler) {
+            try {
+                _isLoading.value = true
+                _error.value = null
+                val result = repository.submitReport(description, imageUri, latitude, longitude, userId)
+                if (result.isSuccess) {
+                    onSuccess()
+                    fetchReports()
+                } else {
+                    _error.value = result.exceptionOrNull()?.localizedMessage ?: "Submit failed"
+                }
+            } catch (e: Exception) {
+                _error.value = e.localizedMessage ?: "Failed to submit report"
+            } finally {
+                _isLoading.value = false
             }
         }
     }

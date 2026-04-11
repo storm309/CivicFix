@@ -10,7 +10,7 @@ import com.google.firebase.database.FirebaseDatabase
 class AuthViewModel : ViewModel() {
     private val auth = FirebaseAuth.getInstance()
     private val database = FirebaseDatabase
-        .getInstance("https://civicfix-92e86-default-rtdb.firebaseio.com/")
+        .getInstance("https://civicfix-92e86-default-rtdb.firebaseio.com")
         .getReference("users")
 
     private val _isLoading = mutableStateOf(false)
