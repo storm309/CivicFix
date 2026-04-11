@@ -1,3 +1,79 @@
 <resources>
     <string name="app_name">CivicFix</string>
+    <string name="app_tagline">Manage Waste Smartly</string>
+
+    <!-- Auth Screens -->
+    <string name="welcome_back">Welcome Back</string>
+    <string name="login_to_account">Login to your account</string>
+    <string name="create_account">Create Account</string>
+    <string name="join_us">Join us to manage waste smartly</string>
+    <string name="email_address">Email Address</string>
+    <string name="email_hint">example@mail.com</string>
+    <string name="password">Password</string>
+    <string name="password_hint">Minimum 6 characters</string>
+    <string name="full_name">Full Name</string>
+    <string name="age">Age</string>
+    <string name="age_range">13-120</string>
+    <string name="phone">Phone</string>
+    <string name="phone_hint">Min 7 digits</string>
+    <string name="gender">Gender</string>
+    <string name="male">Male</string>
+    <string name="female">Female</string>
+    <string name="login_button">Login</string>
+    <string name="signup_button">Sign Up</string>
+    <string name="dont_have_account">Don\'t have an account? Sign Up</string>
+    <string name="already_have_account">Already have an account? Login</string>
+    <string name="hide_password">Hide password</string>
+    <string name="show_password">Show password</string>
+
+    <!-- Home Screen -->
+    <string name="welcome_user">Welcome, %s</string>
+    <string name="user_default">User</string>
+    <string name="user_age_gender">Age: %s | %s</string>
+    <string name="age_not_available">N/A</string>
+    <string name="quick_actions">Quick Actions</string>
+    <string name="report_waste">Report Waste</string>
+    <string name="snap_photo_report">Snap a photo and report issues</string>
+    <string name="view_reports">View Reports</string>
+    <string name="track_submitted_reports">Track your submitted reports</string>
+    <string name="view_map">View Map</string>
+    <string name="locate_waste">Locate waste nearby</string>
+    <string name="logout">Logout</string>
+    <string name="back">Back</string>
+
+    <!-- Report Screen -->
+    <string name="report_waste_title">Report Waste</string>
+    <string name="whats_the_issue">What\'s the issue?</string>
+    <string name="describe_waste">Describe the waste situation here...</string>
+    <string name="take_photo">Take Photo</string>
+    <string name="retake_photo">Retake</string>
+    <string name="location_info">Location Info</string>
+    <string name="fetching_location">Fetching your current location...</string>
+    <string name="coordinates">Lat: %s, Lng: %s</string>
+    <string name="submit_report">Submit Report</string>
+
+    <!-- View Reports Screen -->
+    <string name="waste_reports">Waste Reports</string>
+    <string name="no_reports">No reports yet. Submit your first report from Home.</string>
+    <string name="status_label">Status: %s</string>
+    <string name="location_label">Location: %s, %s</string>
+
+    <!-- Map Screen -->
+    <string name="waste_locations_map">Waste Locations Map</string>
+    <string name="map_disabled_notice">Map preview is currently disabled. Add a valid Google Maps API key to the manifest to enable interactive maps. Reports are listed below as a fallback.</string>
+
+    <!-- Error Messages -->
+    <string name="please_fill_all_fields">Please fill all fields</string>
+    <string name="invalid_email">Enter a valid email address</string>
+    <string name="password_too_short">Password must be at least 6 characters</string>
+    <string name="invalid_age">Age must be between 13 and 120</string>
+    <string name="invalid_phone">Enter a valid phone number</string>
+    <string name="login_failed">Login Failed</string>
+    <string name="signup_failed">Signup Failed</string>
+    <string name="failed_to_save_user_data">Failed to save user data</string>
+    <string name="could_not_load_user_profile">Could not load user profile</string>
+    <string name="describe_issue_before_submit">Please describe the issue before submitting</string>
+
+    <!-- Splash Screen -->
+    <string name="app_logo">App Logo</string>
 </resources>
