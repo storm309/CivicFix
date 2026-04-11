@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "427339857330",
+    "project_id": "civicfix-92e86",
+    "storage_bucket": "civicfix-92e86.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:427339857330:android:4b89f807650e69513e78ab",
+        "android_client_info": {
+          "package_name": "com.example.smartwastemanagementapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBjll5JaJImdYCyIClTv-gqNr4z2nCiNVw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
