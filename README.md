@@ -29,7 +29,7 @@ A modern Android application designed to streamline and improve waste management
 
 1.  **Clone the repository**:
     ```bash
-    git clone https://github.com/your-username/SmartWasteManagementApp.git
+    git clone https://github.com/storm309/CivicFix.git
     ```
 2.  **Firebase Setup**:
     - Create a new project in the [Firebase Console](https://console.firebase.google.com/).
