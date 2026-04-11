@@ -2,7 +2,10 @@ package com.example.smartwastemanagementapp.ui.screens
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.graphics.Bitmap
+import android.graphics.ImageDecoder
 import android.net.Uri
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
@@ -16,7 +19,9 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -51,9 +56,23 @@ fun ReportWasteScreen(
     var description by remember { mutableStateOf("") }
     var imageUri by remember { mutableStateOf<Uri?>(null) }
     var location by remember { mutableStateOf<Pair<Double, Double>?>(null) }
-    
+
+    val aiDescription by viewModel.aiDescription
+    val isAnalyzing by viewModel.isAnalyzing
+    val isLoading by viewModel.isLoading
+    val errorMsg by viewModel.error
+
+    // When AI returns a description, auto-fill the field
+    LaunchedEffect(aiDescription) {
+        aiDescription?.let {
+            description = it
+            viewModel.clearAiDescription()
+        }
+    }
+
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
-    
+
+    // Camera temp file
     val tempUri = remember {
         val file = File(context.cacheDir, "temp_image_${System.currentTimeMillis()}.jpg")
         FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
@@ -63,10 +82,15 @@ fun ReportWasteScreen(
         if (success) imageUri = tempUri
     }
 
+    // Gallery picker
+    val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        uri?.let { imageUri = it }
+    }
+
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
-        if (permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true || 
+        if (permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
             permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true) {
             fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
                 .addOnSuccessListener { loc ->
@@ -76,12 +100,28 @@ fun ReportWasteScreen(
     }
 
     LaunchedEffect(Unit) {
-        permissionLauncher.launch(arrayOf(
-            Manifest.permission.CAMERA,
-            Manifest.permission.ACCESS_FINE_LOCATION,
-            Manifest.permission.ACCESS_COARSE_LOCATION
-        ))
+        permissionLauncher.launch(
+            arrayOf(
+                Manifest.permission.CAMERA,
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            )
+        )
     }
+
+    // Helper: load bitmap for Gemini
+    fun loadBitmap(uri: Uri): Bitmap? = try {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            ImageDecoder.decodeBitmap(
+                ImageDecoder.createSource(context.contentResolver, uri)
+            ) { decoder, _, _ -> decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE }
+                .copy(Bitmap.Config.ARGB_8888, false)
+        } else {
+            @Suppress("DEPRECATION")
+            android.provider.MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
+                ?.copy(Bitmap.Config.ARGB_8888, false)
+        }
+    } catch (e: Exception) { null }
 
     Scaffold(
         topBar = {
@@ -105,18 +145,19 @@ fun ReportWasteScreen(
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+
+            // ── Photo card ──────────────────────────────────────────────────
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(250.dp),
+                    .height(220.dp),
                 shape = RoundedCornerShape(24.dp),
                 elevation = CardDefaults.cardElevation(4.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                )
             ) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     if (imageUri != null) {
                         Image(
                             painter = rememberAsyncImagePainter(imageUri),
@@ -124,59 +165,108 @@ fun ReportWasteScreen(
                             modifier = Modifier.fillMaxSize(),
                             contentScale = ContentScale.Crop
                         )
+                        // Retake button
                         IconButton(
                             onClick = { cameraLauncher.launch(tempUri) },
                             modifier = Modifier
                                 .align(Alignment.BottomEnd)
-                                .padding(16.dp)
+                                .padding(12.dp)
                                 .background(MaterialTheme.colorScheme.primary, CircleShape)
                         ) {
                             Icon(Icons.Default.CameraAlt, contentDescription = "Retake", tint = Color.White)
                         }
                     } else {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
                             Icon(
                                 Icons.Default.CameraAlt,
                                 contentDescription = null,
-                                modifier = Modifier.size(64.dp),
+                                modifier = Modifier.size(52.dp),
                                 tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
                             )
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Button(
-                                onClick = { cameraLauncher.launch(tempUri) },
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                Text("Take Photo")
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                OutlinedButton(
+                                    onClick = { cameraLauncher.launch(tempUri) },
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Icon(Icons.Default.CameraAlt, null, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("Camera")
+                                }
+                                OutlinedButton(
+                                    onClick = { galleryLauncher.launch("image/*") },
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Icon(Icons.Default.Image, null, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("Gallery")
+                                }
                             }
                         }
                     }
                 }
             }
-            
-            Spacer(modifier = Modifier.height(24.dp))
-            
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // ── AI Analyze button (shown when photo is available) ───────────
+            if (imageUri != null) {
+                if (isAnalyzing) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        Text("Analyzing with Gemini AI...", style = MaterialTheme.typography.bodySmall)
+                    }
+                } else {
+                    OutlinedButton(
+                        onClick = {
+                            imageUri?.let { uri ->
+                                val bmp = loadBitmap(uri)
+                                if (bmp != null) viewModel.analyzeWasteImage(bmp)
+                            }
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.primary
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.AutoAwesome, null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("✨ Analyze with Gemini AI", fontWeight = FontWeight.SemiBold)
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+
+            // ── Description field ────────────────────────────────────────────
             OutlinedTextField(
                 value = description,
                 onValueChange = { description = it },
                 label = { Text("What's the issue?") },
                 placeholder = { Text("Describe the waste situation here...") },
-                modifier = Modifier.fillMaxWidth().height(120.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(120.dp),
                 shape = RoundedCornerShape(16.dp),
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Text,
                     imeAction = ImeAction.Done
                 ),
-                keyboardActions = KeyboardActions(
-                    onDone = { focusManager.clearFocus() }
-                ),
+                keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = MaterialTheme.colorScheme.primary,
                     unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
                 )
             )
-            
-            Spacer(modifier = Modifier.height(20.dp))
 
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // ── Location chip ─────────────────────────────────────────────────
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
@@ -193,38 +283,68 @@ fun ReportWasteScreen(
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
-                        Text("Location Info", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
                         Text(
-                            text = if (location != null) "Lat: ${"%.4f".format(location?.first)}, Lng: ${"%.4f".format(location?.second)}" 
-                                   else "Fetching your current location...",
+                            "Location Info",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = if (location != null)
+                                "Lat: ${"%.4f".format(location!!.first)}, Lng: ${"%.4f".format(location!!.second)}"
+                            else "Fetching your current location...",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
             }
-            
-            Spacer(modifier = Modifier.height(32.dp))
-            
-            if (viewModel.isLoading.value) {
+
+            // ── Error message ─────────────────────────────────────────────────
+            errorMsg?.let {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = it,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+
+            Spacer(modifier = Modifier.height(28.dp))
+
+            // ── Submit button ─────────────────────────────────────────────────
+            if (isLoading) {
                 CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
             } else {
                 Button(
                     onClick = {
-                        imageUri?.let { uri ->
-                            location?.let { loc ->
-                                viewModel.submitReport(description, uri, loc.first, loc.second, onSuccess)
-                            }
+                        location?.let { loc ->
+                            viewModel.submitReport(
+                                description = description,
+                                imageUri = imageUri,   // nullable – photo optional
+                                latitude = loc.first,
+                                longitude = loc.second,
+                                onSuccess = onSuccess
+                            )
                         }
                     },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp),
                     shape = RoundedCornerShape(16.dp),
-                    enabled = imageUri != null && location != null,
+                    // Only needs description + location (photo is optional)
+                    enabled = description.isNotBlank() && location != null,
                     elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
                 ) {
                     Text("Submit Report", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                }
+
+                if (location == null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "Waiting for location…",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }

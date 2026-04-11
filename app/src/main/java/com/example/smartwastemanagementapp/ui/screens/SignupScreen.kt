@@ -39,7 +39,7 @@ fun SignupScreen(
     var name by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var age by remember { mutableStateOf("") }
-    var phone by remember { mutableStateOf("") }
+    var phone by remember { mutableStateOf("+91") }
     var gender by remember { mutableStateOf("Male") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
@@ -163,9 +163,14 @@ fun SignupScreen(
                 Spacer(modifier = Modifier.width(12.dp))
                 OutlinedTextField(
                     value = phone,
-                    onValueChange = { if (it.length <= 15 && it.all { char -> char.isDigit() || char == '+' }) phone = it },
+                    onValueChange = { newVal ->
+                        // Always keep +91 prefix, only allow digits after it
+                        val digits = newVal.removePrefix("+91").filter { it.isDigit() }
+                        if (digits.length <= 10) phone = "+91$digits"
+                    },
                     label = { Text("Phone") },
                     leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                    placeholder = { Text("+91XXXXXXXXXX") },
                     modifier = Modifier.weight(2f),
                     shape = RoundedCornerShape(16.dp),
                     keyboardOptions = KeyboardOptions(

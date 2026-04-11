@@ -68,6 +68,9 @@ dependencies {
     // Image Loading
     implementation(libs.coil.compose)
 
+    // Google Generative AI (Gemini 2.0 Flash)
+    implementation(libs.generativeai)
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

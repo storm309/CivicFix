@@ -15,18 +15,21 @@ class WasteRepository {
 
     suspend fun submitReport(
         description: String,
-        imageUri: Uri,
+        imageUri: Uri?,          // nullable – photo is optional
         latitude: Double,
         longitude: Double,
         userId: String
     ): Result<Unit> = try {
-        // 1. Upload image to Firebase Storage
-        val fileName = UUID.randomUUID().toString()
-        val imageRef = storage.reference.child("waste_images/$fileName")
-        imageRef.putFile(imageUri).await()
-        val imageUrl = imageRef.downloadUrl.await().toString()
+        // Upload image only if provided
+        val imageUrl = if (imageUri != null) {
+            val fileName = UUID.randomUUID().toString()
+            val imageRef = storage.reference.child("waste_images/$fileName")
+            imageRef.putFile(imageUri).await()
+            imageRef.downloadUrl.await().toString()
+        } else {
+            ""
+        }
 
-        // 2. Save report to Realtime Database
         val reportId = database.push().key ?: UUID.randomUUID().toString()
         val report = WasteReport(
             id = reportId,
