@@ -194,10 +194,6 @@ Splash (2s) → Home (logged in) / Login (not logged in)
 
 ---
 
-## 📚 Documentation
-
-- **[AGENTS.md](./AGENTS.md)** — Full architecture guide for developers
-- Check project files for inline comments
 
 ---
 
@@ -232,11 +228,9 @@ Then open a Pull Request on GitHub.
 
 ---
 
-## 📞 Support & Questions
+## 👨‍💻 Created by
 
-- 📖 Check **AGENTS.md** for architecture questions
-- 🐛 Open an Issue on GitHub
-- 💬 Review inline code comments
+**Shivam Pandey** - Full-stack Android Developer
 
 ---
 
