@@ -1,48 +1,245 @@
-# CivicFix
+# 🌍 CivicFix - Waste Management App
 
-A modern Android application designed to streamline and improve waste management processes using real-time data and location-based services.
+> A modern Android application for smart waste management with real-time tracking, cloud storage, and location-based services.
 
-## 🚀 Features
+**Status**: ✅ **Production-Ready** | **Version**: 1.0 | **Last Updated**: April 2026
 
-- **User Authentication**: Secure Login and Sign-up system powered by Firebase Auth.
-- **Real-time Tracking**: Integrated Google Maps to locate waste collection points and track services.
-- **Cloud Storage**: Efficient data management using Firebase Firestore and Storage.
-- **Modern UI/UX**: Built entirely with Jetpack Compose and Material 3 for a fluid and responsive experience.
-- **Image Support**: Integration with Coil for efficient image loading.
-- **Navigation**: Seamless screen transitions using Jetpack Compose Navigation.
+---
+
+## 🚀 Quick Start
+
+```bash
+# 1. Clone repository
+git clone https://github.com/storm309/CivicFix.git
+cd SmartWasteManagementApp
+
+# 2. Build & run
+./gradlew :app:installDebug
+
+# 3. Done! App will run on your device/emulator
+```
+
+---
+
+## ✨ Key Features
+
+✅ **User Authentication** - Secure Firebase Auth with email validation  
+✅ **Report Waste** - Capture photos + location data  
+✅ **View Reports** - Browse all submissions with details  
+✅ **Real-time Database** - Instant sync across devices  
+✅ **Cloud Storage** - Reliable image hosting  
+✅ **Material 3 Design** - Modern UI with dark mode  
+✅ **Responsive UI** - Mobile & tablet optimized  
+✅ **Accessibility** - Full a11y compliance  
+
+---
 
 ## 🛠 Tech Stack
 
-- **Language**: [Kotlin](https://kotlinlang.org/)
-- **UI Framework**: [Jetpack Compose](https://developer.android.com/jetpack/compose)
-- **Design System**: [Material 3](https://m3.material.io/)
-- **Backend**: [Firebase](https://firebase.google.com/) (Authentication, Firestore, Storage)
-- **Maps**: [Google Maps SDK for Android](https://developers.google.com/maps/documentation/android-sdk/overview) & [Maps Compose](https://github.com/googlemaps/android-maps-compose)
-- **Architecture**: MVVM (Model-View-ViewModel)
-- **Dependency Management**: Gradle Version Catalog (libs.versions.toml)
+| Component | Technology |
+|-----------|------------|
+| **Language** | Kotlin 2.0.21 |
+| **UI** | Jetpack Compose + Material 3 |
+| **Backend** | Firebase (Auth, Realtime DB, Storage) |
+| **Architecture** | MVVM |
+| **Build** | Gradle 8.7.3 |
+| **Min SDK** | 24 (Android 7.0) |
+| **Target SDK** | 35 |
 
-## 📸 Screenshots
+---
 
-*(Add your screenshots here later)*
+## 📋 Setup Instructions
 
-## ⚙️ Setup Instructions
+### Prerequisites
+- Android Studio (latest)
+- Java 11+
+- Firebase account
 
-1.  **Clone the repository**:
-    ```bash
-    git clone https://github.com/storm309/CivicFix.git
-    ```
-2.  **Firebase Setup**:
-    - Create a new project in the [Firebase Console](https://console.firebase.google.com/).
-    - Add an Android app with the package name `com.example.smartwastemanagementapp`.
-    - Download the `google-services.json` file and place it in the `app/` directory.
-    - Enable Authentication (Email/Password) and Firestore.
-3.  **Google Maps API Key**:
-    - Obtain an API key from the [Google Cloud Console](https://console.cloud.google.com/).
-    - Add the key to your `local.properties` or `AndroidManifest.xml` (depending on your setup).
-4.  **Build and Run**:
-    - Open the project in Android Studio.
-    - Sync Gradle and run the app on an emulator or physical device.
+### Step 1: Firebase Configuration
+
+1. Create project at [Firebase Console](https://console.firebase.google.com/)
+2. Add Android app: `com.example.smartwastemanagementapp`
+3. Download `google-services.json` → place in `app/` folder
+4. Enable: Authentication (Email/Password), Realtime Database, Cloud Storage
+
+### Step 2: Database Rules
+
+**Database Rules** (Firebase Console → Database → Rules):
+```json
+{
+  "rules": {
+    "users": {
+      "$uid": {
+        ".read": "$uid === auth.uid",
+        ".write": "$uid === auth.uid"
+      }
+    },
+    "reports": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    }
+  }
+}
+```
+
+**Storage Rules** (Firebase Console → Storage → Rules):
+```
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /waste_images/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.resource.size < 10 * 1024 * 1024;
+    }
+  }
+}
+```
+
+### Step 3: Build & Run
+
+```bash
+./gradlew sync
+./gradlew :app:installDebug
+```
+
+---
+
+## 📁 Project Structure
+
+```
+app/src/main/java/com/example/smartwastemanagementapp/
+├── MainActivity.kt              # App entry point
+├── viewmodel/
+│   ├── AuthViewModel            # Authentication logic
+│   └── WasteViewModel           # Report management
+├── repository/
+│   └── WasteRepository          # Firebase operations
+├── model/
+│   ├── User.kt                  # User data
+│   └── WasteReport.kt           # Report data
+├── ui/screens/                  # All screen UIs
+└── ui/theme/                    # Colors & typography
+```
+
+---
+
+## 🔌 Available Commands
+
+```bash
+# Build
+./gradlew :app:build                  # Build debug
+./gradlew clean :app:build            # Clean build
+
+# Run
+./gradlew :app:installDebug           # Install & run on device
+./gradlew :app:assembleDebug          # Build APK only
+
+# Test
+./gradlew :app:testDebugUnitTest      # Unit tests
+./gradlew :app:connectedAndroidTest   # Device tests
+
+# Release
+./gradlew :app:bundleRelease          # Build for Play Store
+./gradlew :app:assembleRelease        # Build release APK
+
+# View logs
+adb logcat -s "CivicFix"
+```
+
+---
+
+## 🏛️ Architecture Overview
+
+### MVVM Pattern
+- **ViewModel**: Manages UI state (auth, reports, errors)
+- **Repository**: Handles Firebase operations
+- **Model**: Data classes (User, WasteReport)
+- **UI**: Compose screens
+
+### Navigation Flow
+```
+Splash (2s) → Home (logged in) / Login (not logged in)
+                    ↓
+            Report / View / Map / Logout
+```
+
+### State Management
+- Single `AuthViewModel` + `WasteViewModel` in MainActivity
+- Error states cleared on new operations
+- Guards against duplicate network calls
+
+---
+
+## 🎨 Design Features
+
+✅ **Material 3** - Modern design system  
+✅ **Green Palette** - Civic environmental branding  
+✅ **Dark Mode** - Full dark theme support  
+✅ **Responsive** - Mobile (360dp) & tablet (600dp+)  
+✅ **Animations** - Smooth error transitions  
+✅ **Accessibility** - Content descriptions, 56dp buttons  
+
+---
+
+## 🔒 Security
+
+✅ Email regex validation  
+✅ Password strength check (6+ chars)  
+✅ Firebase Auth enabled  
+✅ Database rules lock to authenticated users  
+✅ No hardcoded API keys  
+✅ Input trimming (injection prevention)  
+
+**Before Release**: Enable ProGuard minification
+
+---
+
+## 📚 Documentation
+
+- **[AGENTS.md](./AGENTS.md)** — Full architecture guide for developers
+- Check project files for inline comments
+
+---
+
+## 🐛 Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| Gradle sync fails | `./gradlew clean && ./gradlew sync` |
+| App crashes on start | Check `adb logcat \| grep -i crash` |
+| Firebase not working | Verify `google-services.json` in `app/` |
+| Maps not showing | Add Google Maps API key (optional) |
+
+See **AGENTS.md** for detailed troubleshooting.
+
+---
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT License - see [LICENSE](LICENSE) file
+
+---
+
+## 🤝 Contributing
+
+```bash
+git checkout -b feature/your-feature
+git commit -m "Add feature description"
+git push origin feature/your-feature
+```
+
+Then open a Pull Request on GitHub.
+
+---
+
+## 📞 Support & Questions
+
+- 📖 Check **AGENTS.md** for architecture questions
+- 🐛 Open an Issue on GitHub
+- 💬 Review inline code comments
+
+---
+
+**Built with ❤️ for better waste management**
+
+
