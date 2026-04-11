@@ -5,11 +5,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import com.example.smartwastemanagementapp.model.User
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.firestore.FirebaseFirestore
 
 class AuthViewModel : ViewModel() {
     private val auth = FirebaseAuth.getInstance()
-    private val database = FirebaseDatabase.getInstance().getReference("users")
+    private val db = FirebaseFirestore.getInstance()
+    private val usersCollection = db.collection("users")
 
     private val _isLoading = mutableStateOf(false)
     val isLoading: State<Boolean> = _isLoading
@@ -24,9 +25,7 @@ class AuthViewModel : ViewModel() {
     val userProfile: State<User?> = _userProfile
 
     init {
-        if (auth.currentUser != null) {
-            fetchUserProfile(auth.currentUser!!.uid)
-        }
+        auth.currentUser?.uid?.let { fetchUserProfile(it) }
     }
 
     fun login(email: String, pass: String, onSuccess: () -> Unit) {
@@ -71,16 +70,17 @@ class AuthViewModel : ViewModel() {
                 if (task.isSuccessful) {
                     val uid = task.result.user?.uid ?: ""
                     val newUser = User(uid, name, email, age, phone, gender)
-                    database.child(uid).setValue(newUser).addOnCompleteListener { dbTask ->
-                        _isLoading.value = false
-                        if (dbTask.isSuccessful) {
-                            _userProfile.value = newUser
-                            _isLoggedIn.value = true
-                            onSuccess()
-                        } else {
-                            _error.value = "Failed to save user data"
+                    usersCollection.document(uid).set(newUser)
+                        .addOnCompleteListener { dbTask ->
+                            _isLoading.value = false
+                            if (dbTask.isSuccessful) {
+                                _userProfile.value = newUser
+                                _isLoggedIn.value = true
+                                onSuccess()
+                            } else {
+                                _error.value = "Failed to save user data: ${dbTask.exception?.message}"
+                            }
                         }
-                    }
                 } else {
                     _isLoading.value = false
                     _error.value = task.exception?.message ?: "Signup Failed"
@@ -89,9 +89,13 @@ class AuthViewModel : ViewModel() {
     }
 
     private fun fetchUserProfile(uid: String) {
-        database.child(uid).get().addOnSuccessListener { snapshot ->
-            _userProfile.value = snapshot.getValue(User::class.java)
-        }
+        usersCollection.document(uid).get()
+            .addOnSuccessListener { snapshot ->
+                _userProfile.value = snapshot.toObject(User::class.java)
+            }
+            .addOnFailureListener {
+                // Profile fetch failure is non-fatal – user can still use the app
+            }
     }
 
     fun logout() {
