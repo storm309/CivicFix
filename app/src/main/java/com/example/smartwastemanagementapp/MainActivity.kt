@@ -21,13 +21,12 @@ class MainActivity : ComponentActivity() {
         setContent {
             SmartWasteManagementAppTheme {
                 val navController = rememberNavController()
-                val authViewModel: AuthViewModel = viewModel()
-                val wasteViewModel: WasteViewModel = viewModel()
 
                 val startDestination = Screen.Splash.route
 
                 NavHost(navController = navController, startDestination = startDestination) {
                     composable(Screen.Splash.route) {
+                        val authViewModel: AuthViewModel = viewModel()
                         SplashScreen(
                             onTimeout = {
                                 val destination = if (authViewModel.isLoggedIn.value) Screen.Home.route else Screen.Login.route
@@ -58,6 +57,7 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                     composable(Screen.Home.route) {
+                        val authViewModel: AuthViewModel = viewModel()
                         HomeScreen(
                             onReportWaste = { navController.navigate(Screen.ReportWaste.route) },
                             onViewReports = { navController.navigate(Screen.ViewReports.route) },
@@ -71,6 +71,7 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                     composable(Screen.ReportWaste.route) {
+                        val wasteViewModel: WasteViewModel = viewModel()
                         ReportWasteScreen(
                             onSuccess = { navController.popBackStack() },
                             onBack = { navController.popBackStack() },
@@ -78,12 +79,14 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                     composable(Screen.ViewReports.route) {
+                        val wasteViewModel: WasteViewModel = viewModel()
                         ViewReportsScreen(
                             onBack = { navController.popBackStack() },
                             viewModel = wasteViewModel
                         )
                     }
                     composable(Screen.Map.route) {
+                        val wasteViewModel: WasteViewModel = viewModel()
                         MapScreen(
                             onBack = { navController.popBackStack() },
                             viewModel = wasteViewModel

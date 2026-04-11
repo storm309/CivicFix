@@ -3,10 +3,13 @@ package com.example.smartwastemanagementapp.viewmodel
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
+import com.example.smartwastemanagementapp.model.User
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.FirebaseDatabase
 
 class AuthViewModel : ViewModel() {
     private val auth = FirebaseAuth.getInstance()
+    private val database = FirebaseDatabase.getInstance().getReference("users")
 
     private val _isLoading = mutableStateOf(false)
     val isLoading: State<Boolean> = _isLoading
@@ -17,44 +20,83 @@ class AuthViewModel : ViewModel() {
     private val _isLoggedIn = mutableStateOf(auth.currentUser != null)
     val isLoggedIn: State<Boolean> = _isLoggedIn
 
+    private val _userProfile = mutableStateOf<User?>(null)
+    val userProfile: State<User?> = _userProfile
+
+    init {
+        if (auth.currentUser != null) {
+            fetchUserProfile(auth.currentUser!!.uid)
+        }
+    }
+
     fun login(email: String, pass: String, onSuccess: () -> Unit) {
         if (email.isBlank() || pass.isBlank()) {
             _error.value = "Please fill all fields"
             return
         }
         _isLoading.value = true
+        _error.value = null
         auth.signInWithEmailAndPassword(email, pass)
             .addOnCompleteListener { task ->
-                _isLoading.value = false
                 if (task.isSuccessful) {
+                    val uid = task.result.user?.uid ?: ""
+                    fetchUserProfile(uid)
                     _isLoggedIn.value = true
+                    _isLoading.value = false
                     onSuccess()
                 } else {
+                    _isLoading.value = false
                     _error.value = task.exception?.message ?: "Login Failed"
                 }
             }
     }
 
-    fun signUp(email: String, pass: String, onSuccess: () -> Unit) {
-        if (email.isBlank() || pass.isBlank()) {
+    fun signUp(
+        name: String,
+        email: String,
+        age: String,
+        phone: String,
+        gender: String,
+        pass: String,
+        onSuccess: () -> Unit
+    ) {
+        if (name.isBlank() || email.isBlank() || age.isBlank() || phone.isBlank() || gender.isBlank() || pass.isBlank()) {
             _error.value = "Please fill all fields"
             return
         }
         _isLoading.value = true
+        _error.value = null
         auth.createUserWithEmailAndPassword(email, pass)
             .addOnCompleteListener { task ->
-                _isLoading.value = false
                 if (task.isSuccessful) {
-                    _isLoggedIn.value = true
-                    onSuccess()
+                    val uid = task.result.user?.uid ?: ""
+                    val newUser = User(uid, name, email, age, phone, gender)
+                    database.child(uid).setValue(newUser).addOnCompleteListener { dbTask ->
+                        _isLoading.value = false
+                        if (dbTask.isSuccessful) {
+                            _userProfile.value = newUser
+                            _isLoggedIn.value = true
+                            onSuccess()
+                        } else {
+                            _error.value = "Failed to save user data"
+                        }
+                    }
                 } else {
+                    _isLoading.value = false
                     _error.value = task.exception?.message ?: "Signup Failed"
                 }
             }
     }
 
+    private fun fetchUserProfile(uid: String) {
+        database.child(uid).get().addOnSuccessListener { snapshot ->
+            _userProfile.value = snapshot.getValue(User::class.java)
+        }
+    }
+
     fun logout() {
         auth.signOut()
         _isLoggedIn.value = false
+        _userProfile.value = null
     }
 }

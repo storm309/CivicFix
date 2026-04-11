@@ -2,13 +2,12 @@ package com.example.smartwastemanagementapp.ui.screens
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -33,20 +32,27 @@ fun SignupScreen(
     onNavigateToLogin: () -> Unit,
     viewModel: AuthViewModel = viewModel()
 ) {
+    var name by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
+    var age by remember { mutableStateOf("") }
+    var phone by remember { mutableStateOf("") }
+    var gender by remember { mutableStateOf("Male") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
+
+    val scrollState = rememberScrollState()
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp),
+            .padding(24.dp)
+            .verticalScroll(scrollState),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Surface(
             modifier = Modifier
-                .size(120.dp)
+                .size(100.dp)
                 .clip(RoundedCornerShape(16.dp)),
             color = MaterialTheme.colorScheme.surfaceVariant,
             shadowElevation = 4.dp
@@ -59,11 +65,11 @@ fun SignupScreen(
             )
         }
         
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(24.dp))
         
         Text(
             text = "Create Account",
-            style = MaterialTheme.typography.headlineLarge.copy(
+            style = MaterialTheme.typography.headlineMedium.copy(
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 0.5.sp
             ),
@@ -71,25 +77,75 @@ fun SignupScreen(
         )
         Text(
             text = "Join us to manage waste smartly",
-            style = MaterialTheme.typography.bodyLarge,
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         
-        Spacer(modifier = Modifier.height(40.dp))
+        Spacer(modifier = Modifier.height(32.dp))
+
+        OutlinedTextField(
+            value = name,
+            onValueChange = { name = it },
+            label = { Text("Full Name") },
+            leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            singleLine = true
+        )
+        
+        Spacer(modifier = Modifier.height(12.dp))
         
         OutlinedTextField(
             value = email,
             onValueChange = { email = it },
             label = { Text("Email Address") },
-            placeholder = { Text("example@mail.com") },
             leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
             singleLine = true
         )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Row(modifier = Modifier.fillMaxWidth()) {
+            OutlinedTextField(
+                value = age,
+                onValueChange = { if (it.all { char -> char.isDigit() }) age = it },
+                label = { Text("Age") },
+                leadingIcon = { Icon(Icons.Default.DateRange, contentDescription = null) },
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(12.dp),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                singleLine = true
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            OutlinedTextField(
+                value = phone,
+                onValueChange = { if (it.all { char -> char.isDigit() }) phone = it },
+                label = { Text("Phone") },
+                leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null) },
+                modifier = Modifier.weight(2f),
+                shape = RoundedCornerShape(12.dp),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                singleLine = true
+            )
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Text("Gender", style = MaterialTheme.typography.labelLarge)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                RadioButton(selected = gender == "Male", onClick = { gender = "Male" })
+                Text("Male")
+                Spacer(modifier = Modifier.width(16.dp))
+                RadioButton(selected = gender == "Female", onClick = { gender = "Female" })
+                Text("Female")
+            }
+        }
         
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(12.dp))
         
         OutlinedTextField(
             value = password,
@@ -124,7 +180,7 @@ fun SignupScreen(
             CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
         } else {
             Button(
-                onClick = { viewModel.signUp(email, password, onSignupSuccess) },
+                onClick = { viewModel.signUp(name, email, age, phone, gender, password, onSignupSuccess) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),

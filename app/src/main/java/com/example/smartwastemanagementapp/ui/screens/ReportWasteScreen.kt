@@ -6,15 +6,26 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import coil.compose.rememberAsyncImagePainter
 import com.example.smartwastemanagementapp.viewmodel.WasteViewModel
@@ -68,50 +79,120 @@ fun ReportWasteScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Report Waste") })
+            TopAppBar(
+                title = { Text("Report Waste", fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                }
+            )
         }
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp)
+                .padding(20.dp)
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            if (imageUri != null) {
-                Image(
-                    painter = rememberAsyncImagePainter(imageUri),
-                    contentDescription = null,
-                    modifier = Modifier.size(200.dp)
-                )
-            } else {
-                Button(onClick = { cameraLauncher.launch(tempUri) }) {
-                    Text("Take Photo")
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(250.dp),
+                shape = RoundedCornerShape(24.dp),
+                elevation = CardDefaults.cardElevation(4.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            ) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (imageUri != null) {
+                        Image(
+                            painter = rememberAsyncImagePainter(imageUri),
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                        IconButton(
+                            onClick = { cameraLauncher.launch(tempUri) },
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(16.dp)
+                                .background(MaterialTheme.colorScheme.primary, CircleShape)
+                        ) {
+                            Icon(Icons.Default.CameraAlt, contentDescription = "Retake", tint = Color.White)
+                        }
+                    } else {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                Icons.Default.CameraAlt,
+                                contentDescription = null,
+                                modifier = Modifier.size(64.dp),
+                                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Button(
+                                onClick = { cameraLauncher.launch(tempUri) },
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Text("Take Photo")
+                            }
+                        }
+                    }
                 }
             }
             
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(24.dp))
             
             OutlinedTextField(
                 value = description,
                 onValueChange = { description = it },
-                label = { Text("Description") },
-                modifier = Modifier.fillMaxWidth()
+                label = { Text("What's the issue?") },
+                placeholder = { Text("Describe the waste situation here...") },
+                modifier = Modifier.fillMaxWidth().height(120.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                )
             )
             
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            Text(
-                text = if (location != null) "Location Captured: ${location?.first}, ${location?.second}" 
-                       else "Capturing Location...",
-                style = MaterialTheme.typography.bodyMedium
-            )
+            Spacer(modifier = Modifier.height(20.dp))
+
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.LocationOn,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text("Location Info", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                        Text(
+                            text = if (location != null) "Lat: ${"%.4f".format(location?.first)}, Lng: ${"%.4f".format(location?.second)}" 
+                                   else "Fetching your current location...",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
             
             Spacer(modifier = Modifier.height(32.dp))
             
             if (viewModel.isLoading.value) {
-                CircularProgressIndicator()
+                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
             } else {
                 Button(
                     onClick = {
@@ -121,10 +202,14 @@ fun ReportWasteScreen(
                             }
                         }
                     },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = imageUri != null && location != null
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    enabled = imageUri != null && location != null,
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
                 ) {
-                    Text("Submit Report")
+                    Text("Submit Report", fontSize = 18.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }

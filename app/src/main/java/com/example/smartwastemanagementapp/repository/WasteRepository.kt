@@ -2,15 +2,14 @@ package com.example.smartwastemanagementapp.repository
 
 import android.net.Uri
 import com.example.smartwastemanagementapp.model.WasteReport
-import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.tasks.await
 import java.util.UUID
 
 class WasteRepository {
-    private val firestore = FirebaseFirestore.getInstance()
+    private val database = FirebaseDatabase.getInstance().getReference("reports")
     private val storage = FirebaseStorage.getInstance()
-    private val reportsCollection = firestore.collection("reports")
 
     suspend fun submitReport(
         description: String,
@@ -25,8 +24,8 @@ class WasteRepository {
         imageRef.putFile(imageUri).await()
         val imageUrl = imageRef.downloadUrl.await().toString()
 
-        // 2. Save Report to Firestore
-        val reportId = reportsCollection.document().id
+        // 2. Save Report to Realtime Database
+        val reportId = database.push().key ?: UUID.randomUUID().toString()
         val report = WasteReport(
             id = reportId,
             description = description,
@@ -35,14 +34,15 @@ class WasteRepository {
             longitude = longitude,
             reportedBy = userId
         )
-        reportsCollection.document(reportId).set(report).await()
+        database.child(reportId).setValue(report).await()
         Result.success(Unit)
     } catch (e: Exception) {
         Result.failure(e)
     }
 
     suspend fun getAllReports(): List<WasteReport> = try {
-        reportsCollection.get().await().toObjects(WasteReport::class.java)
+        val snapshot = database.get().await()
+        snapshot.children.mapNotNull { it.getValue(WasteReport::class.java) }
     } catch (e: Exception) {
         emptyList()
     }
