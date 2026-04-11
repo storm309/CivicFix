@@ -6,7 +6,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
-import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
@@ -117,7 +117,7 @@ fun HomeScreen(
 
             HomeCard("Report Waste", "Snap a photo and report issues", Icons.Default.Add, MaterialTheme.colorScheme.primary, onReportWaste)
             Spacer(modifier = Modifier.height(16.dp))
-            HomeCard("View Reports", "Track your submitted reports", Icons.AutoMirrored.Filled.List, MaterialTheme.colorScheme.secondary, onViewReports)
+            HomeCard("View Reports", "Track your submitted reports", Icons.AutoMirrored.Filled.KeyboardArrowRight, MaterialTheme.colorScheme.secondary, onViewReports)
             Spacer(modifier = Modifier.height(16.dp))
             HomeCard("View Map", "Locate waste nearby", Icons.Default.LocationOn, MaterialTheme.colorScheme.tertiary, onViewMap)
         }
@@ -149,7 +149,7 @@ fun HomeCard(title: String, subtitle: String, icon: ImageVector, color: Color, o
                 Text(title, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
                 Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Icon(Icons.Default.LocationOn, contentDescription = null, tint = MaterialTheme.colorScheme.outline) // Placeholder for arrow
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.outline)
         }
     }
 }
