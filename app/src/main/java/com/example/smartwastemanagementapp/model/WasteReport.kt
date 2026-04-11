@@ -1,9 +1,6 @@
 package com.example.smartwastemanagementapp.model
 
-import com.google.firebase.firestore.DocumentId
-
 data class WasteReport(
-    @DocumentId
     val id: String = "",
     val description: String = "",
     val imageUrl: String = "",

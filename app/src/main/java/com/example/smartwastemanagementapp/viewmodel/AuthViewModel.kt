@@ -5,12 +5,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import com.example.smartwastemanagementapp.model.User
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.database.FirebaseDatabase
 
 class AuthViewModel : ViewModel() {
     private val auth = FirebaseAuth.getInstance()
-    private val db = FirebaseFirestore.getInstance()
-    private val usersCollection = db.collection("users")
+    private val database = FirebaseDatabase
+        .getInstance("https://civicfix-92e86-default-rtdb.firebaseio.com/")
+        .getReference("users")
 
     private val _isLoading = mutableStateOf(false)
     val isLoading: State<Boolean> = _isLoading
@@ -70,7 +71,7 @@ class AuthViewModel : ViewModel() {
                 if (task.isSuccessful) {
                     val uid = task.result.user?.uid ?: ""
                     val newUser = User(uid, name, email, age, phone, gender)
-                    usersCollection.document(uid).set(newUser)
+                    database.child(uid).setValue(newUser)
                         .addOnCompleteListener { dbTask ->
                             _isLoading.value = false
                             if (dbTask.isSuccessful) {
@@ -89,12 +90,12 @@ class AuthViewModel : ViewModel() {
     }
 
     private fun fetchUserProfile(uid: String) {
-        usersCollection.document(uid).get()
+        database.child(uid).get()
             .addOnSuccessListener { snapshot ->
-                _userProfile.value = snapshot.toObject(User::class.java)
+                _userProfile.value = snapshot.getValue(User::class.java)
             }
             .addOnFailureListener {
-                // Profile fetch failure is non-fatal – user can still use the app
+                // Non-fatal – user can still navigate the app
             }
     }
 

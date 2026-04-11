@@ -2,14 +2,15 @@ package com.example.smartwastemanagementapp.repository
 
 import android.net.Uri
 import com.example.smartwastemanagementapp.model.WasteReport
-import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.tasks.await
 import java.util.UUID
 
 class WasteRepository {
-    private val db = FirebaseFirestore.getInstance()
-    private val reportsCollection = db.collection("reports")
+    private val database = FirebaseDatabase
+        .getInstance("https://civicfix-92e86-default-rtdb.firebaseio.com/")
+        .getReference("reports")
     private val storage = FirebaseStorage.getInstance()
 
     suspend fun submitReport(
@@ -25,28 +26,26 @@ class WasteRepository {
         imageRef.putFile(imageUri).await()
         val imageUrl = imageRef.downloadUrl.await().toString()
 
-        // 2. Save report to Firestore
-        val reportRef = reportsCollection.document()
+        // 2. Save report to Realtime Database
+        val reportId = database.push().key ?: UUID.randomUUID().toString()
         val report = WasteReport(
-            id = reportRef.id,
+            id = reportId,
             description = description,
             imageUrl = imageUrl,
             latitude = latitude,
             longitude = longitude,
             reportedBy = userId
         )
-        reportRef.set(report).await()
+        database.child(reportId).setValue(report).await()
         Result.success(Unit)
     } catch (e: Exception) {
         Result.failure(e)
     }
 
     suspend fun getAllReports(): List<WasteReport> = try {
-        val snapshot = reportsCollection
-            .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
-            .get()
-            .await()
-        snapshot.toObjects(WasteReport::class.java)
+        val snapshot = database.get().await()
+        snapshot.children.mapNotNull { it.getValue(WasteReport::class.java) }
+            .sortedByDescending { it.timestamp }
     } catch (e: Exception) {
         emptyList()
     }
