@@ -31,156 +31,151 @@ import kotlinx.coroutines.delay
 fun SplashScreen(onTimeout: () -> Unit) {
     val currentOnTimeout by rememberUpdatedState(onTimeout)
 
+    // Navigate after delay
     LaunchedEffect(Unit) {
         delay(2500)
         currentOnTimeout()
     }
 
-    // Logo scale: 0.4 → 1.0
+    // Fade-in + scale-up animation for the logo card
+    var animStarted by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        delay(50)           // tiny delay so first frame renders the gradient first
+        animStarted = true
+    }
+
     val logoScale by animateFloatAsState(
-        targetValue = 1f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness    = Spring.StiffnessLow
-        ),
-        label = "logo_scale"
+        targetValue   = if (animStarted) 1f else 0.4f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+        label         = "logo_scale"
     )
-
-    // Alpha: 0 → 1
-    val alpha by animateFloatAsState(
-        targetValue  = 1f,
-        animationSpec = tween(durationMillis = 700, easing = FastOutSlowInEasing),
-        label        = "splash_alpha"
+    val contentAlpha by animateFloatAsState(
+        targetValue   = if (animStarted) 1f else 0f,
+        animationSpec = tween(700, easing = FastOutSlowInEasing),
+        label         = "alpha"
     )
-
-    // Text slide-up offset: 40 → 0 dp
     val textOffset by animateFloatAsState(
-        targetValue  = 0f,
-        animationSpec = tween(durationMillis = 800, delayMillis = 300, easing = FastOutSlowInEasing),
-        label        = "text_offset"
+        targetValue   = if (animStarted) 0f else 40f,
+        animationSpec = tween(800, delayMillis = 200, easing = FastOutSlowInEasing),
+        label         = "text_offset"
     )
 
-    // Tagline fade
-    val taglineAlpha by animateFloatAsState(
-        targetValue  = 1f,
-        animationSpec = tween(durationMillis = 600, delayMillis = 700, easing = LinearEasing),
-        label        = "tagline_alpha"
-    )
-
-    // Pulsing ring animation
+    // Infinite pulse for background rings
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 0.9f,
-        targetValue  = 1.05f,
+        initialValue  = 0.88f,
+        targetValue   = 1.06f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1200, easing = FastOutSlowInEasing),
+            animation  = tween(1400, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "pulse_scale"
+    )
+
+    // Three loading dots – each gets its own infiniteTransition value at the top level
+    val dot1 by infiniteTransition.animateFloat(
+        initialValue  = 0.5f,
+        targetValue   = 1.3f,
+        animationSpec = infiniteRepeatable(tween(500), RepeatMode.Reverse),
+        label         = "dot1"
+    )
+    val dot2 by infiniteTransition.animateFloat(
+        initialValue  = 0.5f,
+        targetValue   = 1.3f,
+        animationSpec = infiniteRepeatable(tween(500, delayMillis = 150), RepeatMode.Reverse),
+        label         = "dot2"
+    )
+    val dot3 by infiniteTransition.animateFloat(
+        initialValue  = 0.5f,
+        targetValue   = 1.3f,
+        animationSpec = infiniteRepeatable(tween(500, delayMillis = 300), RepeatMode.Reverse),
+        label         = "dot3"
     )
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        EcoGreen40,
-                        EcoGreen50,
-                        Teal40
-                    )
-                )
+                Brush.verticalGradient(listOf(EcoGreen40, EcoGreen50, Teal40))
             ),
         contentAlignment = Alignment.Center
     ) {
-        // Background decorative circles
+        // Pulsing decorative rings (drawn behind content)
         Box(
             modifier = Modifier
                 .size(320.dp)
                 .scale(pulseScale)
-                .alpha(0.08f)
+                .alpha(0.07f)
                 .background(Color.White, RoundedCornerShape(50))
         )
         Box(
             modifier = Modifier
-                .size(220.dp)
-                .scale(1.1f - (pulseScale - 0.9f))
-                .alpha(0.06f)
+                .size(210.dp)
+                .scale(1.12f - (pulseScale - 0.88f))
+                .alpha(0.05f)
                 .background(Color.White, RoundedCornerShape(50))
         )
 
+        // Main content
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-            modifier = Modifier.alpha(alpha)
+            modifier            = Modifier.alpha(contentAlpha)
         ) {
-            // Logo card with shadow
+            // Logo card
             Box(
                 modifier = Modifier
                     .size(130.dp)
                     .scale(logoScale)
-                    .shadow(elevation = 24.dp, shape = RoundedCornerShape(32.dp))
+                    .shadow(elevation = 20.dp, shape = RoundedCornerShape(32.dp))
                     .clip(RoundedCornerShape(32.dp))
                     .background(Color.White),
                 contentAlignment = Alignment.Center
             ) {
                 Image(
-                    painter = painterResource(id = R.drawable.app_logo),
+                    painter            = painterResource(R.drawable.app_logo),
                     contentDescription = "CivicFix Logo",
-                    modifier = Modifier
-                        .size(90.dp)
-                        .padding(4.dp)
+                    modifier           = Modifier.size(88.dp).padding(4.dp)
                 )
             }
 
-            Spacer(modifier = Modifier.height(28.dp))
+            Spacer(Modifier.height(28.dp))
 
-            // App name
             Text(
-                text = "CivicFix",
-                style = MaterialTheme.typography.headlineLarge.copy(
-                    fontWeight = FontWeight.ExtraBold,
-                    fontSize   = 36.sp,
+                text     = "CivicFix",
+                style    = MaterialTheme.typography.headlineLarge.copy(
+                    fontWeight    = FontWeight.ExtraBold,
+                    fontSize      = 36.sp,
                     letterSpacing = (-1).sp
                 ),
-                color  = Color.White,
+                color    = Color.White,
                 modifier = Modifier.offset(y = textOffset.dp)
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(Modifier.height(8.dp))
 
             Text(
-                text     = "Smart Civic Waste Management",
-                style    = MaterialTheme.typography.bodyLarge,
-                color    = Color.White.copy(alpha = 0.85f),
-                textAlign = TextAlign.Center,
-                modifier = Modifier.alpha(taglineAlpha)
+                text      = "Smart Civic Waste Management",
+                style     = MaterialTheme.typography.bodyLarge,
+                color     = Color.White.copy(alpha = 0.85f),
+                textAlign = TextAlign.Center
             )
 
-            Spacer(modifier = Modifier.height(60.dp))
+            Spacer(Modifier.height(56.dp))
 
-            // Loading dots
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.alpha(taglineAlpha)
-            ) {
-                repeat(3) { index ->
-                    val dotScale by infiniteTransition.animateFloat(
-                        initialValue = 0.6f,
-                        targetValue  = 1.2f,
-                        animationSpec = infiniteRepeatable(
-                            animation = tween(500, delayMillis = index * 150),
-                            repeatMode = RepeatMode.Reverse
-                        ),
-                        label = "dot_$index"
-                    )
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .scale(dotScale)
-                            .background(Color.White.copy(alpha = 0.7f), RoundedCornerShape(50))
-                    )
-                }
+            // Animated loading dots (declared at top level – no repeat{} Composable)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Box(
+                    modifier = Modifier.size(8.dp).scale(dot1)
+                        .background(Color.White.copy(0.7f), RoundedCornerShape(50))
+                )
+                Box(
+                    modifier = Modifier.size(8.dp).scale(dot2)
+                        .background(Color.White.copy(0.7f), RoundedCornerShape(50))
+                )
+                Box(
+                    modifier = Modifier.size(8.dp).scale(dot3)
+                        .background(Color.White.copy(0.7f), RoundedCornerShape(50))
+                )
             }
         }
     }

@@ -195,36 +195,53 @@ fun HomeScreen(
 
             Spacer(Modifier.height(14.dp))
 
-            // ── Action cards ──────────────────────────────────────
-            val cards = listOf(
-                Triple("Report Waste Issue", "Snap a photo & report waste problems near you", Icons.Default.Add) to
-                    Pair(Brush.linearGradient(listOf(EcoGreen40, EcoGreen60)), onReportWaste),
-                Triple("View All Reports", "Track status of submitted civic complaints", Icons.AutoMirrored.Filled.List) to
-                    Pair(Brush.linearGradient(listOf(Teal40, Color(0xFF00BFA5))), onViewReports),
-                Triple("Waste Map", "See waste hotspots & reported locations on map", Icons.Default.Map) to
-                    Pair(Brush.linearGradient(listOf(Color(0xFF1565C0), Color(0xFF42A5F5))), onViewMap),
-            )
-
-            cards.forEachIndexed { index, (info, action) ->
-                val (title, subtitle, icon) = info
-                val (gradient, onClick)    = action
-
-                AnimatedVisibility(
-                    visible = visible,
-                    enter   = fadeIn(tween(300, delayMillis = index * 120)) +
-                              slideInVertically(tween(300, delayMillis = index * 120)) { it / 2 }
-                ) {
-                    ActionCard(
-                        title    = title,
-                        subtitle = subtitle,
-                        icon     = icon,
-                        gradient = gradient,
-                        onClick  = onClick,
-                        modifier = Modifier.padding(horizontal = 20.dp)
-                    )
-                }
-                Spacer(Modifier.height(14.dp))
+            // ── Action cards (simple, no destructuring) ───────────
+            AnimatedVisibility(
+                visible = visible,
+                enter   = fadeIn(tween(300)) + slideInVertically(tween(300)) { it / 2 }
+            ) {
+                ActionCard(
+                    title    = "Report Waste Issue",
+                    subtitle = "Snap a photo & report waste problems near you",
+                    icon     = Icons.Default.Add,
+                    gradient = Brush.linearGradient(listOf(EcoGreen40, EcoGreen60)),
+                    onClick  = onReportWaste,
+                    modifier = Modifier.padding(horizontal = 20.dp)
+                )
             }
+            Spacer(Modifier.height(14.dp))
+
+            AnimatedVisibility(
+                visible = visible,
+                enter   = fadeIn(tween(300, delayMillis = 120)) +
+                          slideInVertically(tween(300, delayMillis = 120)) { it / 2 }
+            ) {
+                ActionCard(
+                    title    = "View All Reports",
+                    subtitle = "Track status of submitted civic complaints",
+                    icon     = Icons.AutoMirrored.Filled.List,
+                    gradient = Brush.linearGradient(listOf(Teal40, Color(0xFF00BFA5))),
+                    onClick  = onViewReports,
+                    modifier = Modifier.padding(horizontal = 20.dp)
+                )
+            }
+            Spacer(Modifier.height(14.dp))
+
+            AnimatedVisibility(
+                visible = visible,
+                enter   = fadeIn(tween(300, delayMillis = 240)) +
+                          slideInVertically(tween(300, delayMillis = 240)) { it / 2 }
+            ) {
+                ActionCard(
+                    title    = "Waste Map",
+                    subtitle = "See waste hotspots & reported locations on map",
+                    icon     = Icons.Default.Map,
+                    gradient = Brush.linearGradient(listOf(Color(0xFF1565C0), Color(0xFF42A5F5))),
+                    onClick  = onViewMap,
+                    modifier = Modifier.padding(horizontal = 20.dp)
+                )
+            }
+            Spacer(Modifier.height(14.dp))
 
             // ── Tips section ──────────────────────────────────────
             Spacer(Modifier.height(8.dp))
