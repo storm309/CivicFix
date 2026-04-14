@@ -17,18 +17,13 @@
                     <option name="height" value="1280" />
                     <option name="width" value="720" />
                   </DisplayDescriptor>
-                  <DisplayDescriptor>
-                    <option name="displayId" value="2" />
-                    <option name="height" value="1280" />
-                    <option name="width" value="720" />
-                  </DisplayDescriptor>
                 </list>
               </option>
               <option name="panelState">
                 <PanelState>
                   <option name="splitPanel">
                     <SplitPanelState>
-                      <option name="proportion" value="0.6279069781303406" />
+                      <option name="proportion" value="0.6610169410705566" />
                       <option name="firstComponent">
                         <PanelState>
                           <option name="displayId" value="0" />
@@ -36,21 +31,7 @@
                       </option>
                       <option name="secondComponent">
                         <PanelState>
-                          <option name="splitPanel">
-                            <SplitPanelState>
-                              <option name="splitType" value="VERTICAL" />
-                              <option name="firstComponent">
-                                <PanelState>
-                                  <option name="displayId" value="1" />
-                                </PanelState>
-                              </option>
-                              <option name="secondComponent">
-                                <PanelState>
-                                  <option name="displayId" value="2" />
-                                </PanelState>
-                              </option>
-                            </SplitPanelState>
-                          </option>
+                          <option name="displayId" value="1" />
                         </PanelState>
                       </option>
                     </SplitPanelState>

@@ -21,37 +21,29 @@ class MainActivity : ComponentActivity() {
         setContent {
             SmartWasteManagementAppTheme {
                 val navController = rememberNavController()
+                val authViewModel: AuthViewModel = viewModel()
 
-                val startDestination = Screen.Splash.route
+                // Start directly at Login or Home to bypass splash screen hangs
+                val startDestination = if (authViewModel.isLoggedIn.value) Screen.Home.route else Screen.Login.route
 
                 NavHost(navController = navController, startDestination = startDestination) {
-                    composable(Screen.Splash.route) {
-                        val authViewModel: AuthViewModel = viewModel()
-                        SplashScreen(
-                            onTimeout = {
-                                val destination = if (authViewModel.isLoggedIn.value) Screen.Home.route else Screen.Login.route
-                                navController.navigate(destination) {
-                                    popUpTo(Screen.Splash.route) { inclusive = true }
-                                }
-                            }
-                        )
-                    }
                     composable(Screen.Login.route) {
+
                         LoginScreen(
-                            onLoginSuccess = { 
-                                navController.navigate(Screen.Home.route) { 
-                                    popUpTo(Screen.Login.route) { inclusive = true } 
-                                } 
+                            onLoginSuccess = {
+                                navController.navigate(Screen.Home.route) {
+                                    popUpTo(Screen.Login.route) { inclusive = true }
+                                }
                             },
                             onNavigateToSignup = { navController.navigate(Screen.Signup.route) }
                         )
                     }
                     composable(Screen.Signup.route) {
                         SignupScreen(
-                            onSignupSuccess = { 
-                                navController.navigate(Screen.Home.route) { 
-                                    popUpTo(Screen.Signup.route) { inclusive = true } 
-                                } 
+                            onSignupSuccess = {
+                                navController.navigate(Screen.Home.route) {
+                                    popUpTo(Screen.Signup.route) { inclusive = true }
+                                }
                             },
                             onNavigateToLogin = { navController.navigate(Screen.Login.route) }
                         )
@@ -62,10 +54,10 @@ class MainActivity : ComponentActivity() {
                             onReportWaste = { navController.navigate(Screen.ReportWaste.route) },
                             onViewReports = { navController.navigate(Screen.ViewReports.route) },
                             onViewMap = { navController.navigate(Screen.Map.route) },
-                            onLogout = { 
-                                navController.navigate(Screen.Login.route) { 
-                                    popUpTo(Screen.Home.route) { inclusive = true } 
-                                } 
+                            onLogout = {
+                                navController.navigate(Screen.Login.route) {
+                                    popUpTo(Screen.Home.route) { inclusive = true }
+                                }
                             },
                             authViewModel = authViewModel
                         )
