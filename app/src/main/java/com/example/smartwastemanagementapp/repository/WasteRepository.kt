@@ -1,6 +1,7 @@
 package com.example.smartwastemanagementapp.repository
 
 import android.net.Uri
+import com.example.smartwastemanagementapp.model.ReportModerationStatus
 import com.example.smartwastemanagementapp.model.WasteReport
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.storage.FirebaseStorage
@@ -18,7 +19,9 @@ class WasteRepository {
         imageUri: Uri?,          // nullable – photo is optional
         latitude: Double,
         longitude: Double,
-        userId: String
+        userId: String,
+        aiSafetyScore: Double = 0.0,
+        aiSafetyLabel: String = "unchecked"
     ): Result<Unit> = try {
         // Upload image only if provided
         val imageUrl = if (imageUri != null) {
@@ -37,6 +40,11 @@ class WasteRepository {
             imageUrl = imageUrl,
             latitude = latitude,
             longitude = longitude,
+            moderationStatus = ReportModerationStatus.PENDING_APPROVAL.dbValue,
+            moderationUpdatedAt = System.currentTimeMillis(),
+            moderationNote = "Awaiting admin review",
+            aiSafetyScore = aiSafetyScore,
+            aiSafetyLabel = aiSafetyLabel,
             reportedBy = userId
         )
         database.child(reportId).setValue(report).await()
@@ -51,5 +59,30 @@ class WasteRepository {
             .sortedByDescending { it.timestamp }
     } catch (e: Exception) {
         emptyList()
+    }
+
+    suspend fun getPendingModerationReports(): List<WasteReport> {
+        return getAllReports().filter {
+            ReportModerationStatus.from(it.moderationStatus) == ReportModerationStatus.PENDING_APPROVAL
+        }
+    }
+
+    suspend fun updateModerationStatus(
+        reportId: String,
+        status: ReportModerationStatus,
+        moderatedBy: String,
+        note: String
+    ): Result<Unit> = try {
+        val updates = mapOf(
+            "moderationStatus" to status.dbValue,
+            "moderationUpdatedAt" to System.currentTimeMillis(),
+            "moderationNote" to note,
+            "moderatedBy" to moderatedBy,
+            "status" to if (status == ReportModerationStatus.APPROVED) "Pending" else "Rejected"
+        )
+        database.child(reportId).updateChildren(updates).await()
+        Result.success(Unit)
+    } catch (e: Exception) {
+        Result.failure(e)
     }
 }

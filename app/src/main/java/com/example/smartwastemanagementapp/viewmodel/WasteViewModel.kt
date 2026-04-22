@@ -6,6 +6,7 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.smartwastemanagementapp.model.ReportModerationStatus
 import com.example.smartwastemanagementapp.model.WasteReport
 import com.example.smartwastemanagementapp.repository.WasteRepository
 import com.google.ai.client.generativeai.GenerativeModel
@@ -17,6 +18,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 private const val GEMINI_API_KEY = "AIzaSyBMGGfKztkvtlovWp27oj1GlrngN0DBLKc"
+
+data class ImageModerationResult(
+    val score: Double,
+    val label: String,
+    val reason: String
+)
 
 class WasteViewModel(private val repository: WasteRepository = WasteRepository()) : ViewModel() {
 
@@ -32,8 +39,14 @@ class WasteViewModel(private val repository: WasteRepository = WasteRepository()
     private val _aiDescription = mutableStateOf<String?>(null)
     val aiDescription: State<String?> = _aiDescription
 
+    private val _imageModeration = mutableStateOf<ImageModerationResult?>(null)
+    val imageModeration: State<ImageModerationResult?> = _imageModeration
+
     private val _isAnalyzing = mutableStateOf(false)
     val isAnalyzing: State<Boolean> = _isAnalyzing
+
+    private val _pendingReports = MutableStateFlow<List<WasteReport>>(emptyList())
+    val pendingReports: StateFlow<List<WasteReport>> = _pendingReports
 
     // Catches any uncaught exception from a coroutine so the app never crashes
     private val exceptionHandler = CoroutineExceptionHandler { _, throwable ->
@@ -44,6 +57,7 @@ class WasteViewModel(private val repository: WasteRepository = WasteRepository()
 
     init {
         fetchReports()
+        fetchPendingReports()
     }
 
     fun fetchReports() {
@@ -60,6 +74,12 @@ class WasteViewModel(private val repository: WasteRepository = WasteRepository()
         }
     }
 
+    fun fetchPendingReports() {
+        viewModelScope.launch(exceptionHandler) {
+            _pendingReports.value = repository.getPendingModerationReports()
+        }
+    }
+
     fun submitReport(
         description: String,
         imageUri: Uri?,             // optional photo
@@ -70,12 +90,31 @@ class WasteViewModel(private val repository: WasteRepository = WasteRepository()
         val userId = FirebaseAuth.getInstance().currentUser?.uid ?: "anonymous"
         viewModelScope.launch(exceptionHandler) {
             try {
+                val moderation = _imageModeration.value
+                if (imageUri != null && moderation == null) {
+                    _error.value = "Please analyze image before submitting so unsafe uploads can be blocked"
+                    return@launch
+                }
+                if (imageUri != null && moderation != null && moderation.score < 0.60) {
+                    _error.value = "Image blocked by AI moderation. Upload a clear waste-related photo."
+                    return@launch
+                }
                 _isLoading.value = true
                 _error.value = null
-                val result = repository.submitReport(description, imageUri, latitude, longitude, userId)
+                val result = repository.submitReport(
+                    description = description,
+                    imageUri = imageUri,
+                    latitude = latitude,
+                    longitude = longitude,
+                    userId = userId,
+                    aiSafetyScore = moderation?.score ?: 0.0,
+                    aiSafetyLabel = moderation?.label ?: "unchecked"
+                )
                 if (result.isSuccess) {
                     onSuccess()
                     fetchReports()
+                    fetchPendingReports()
+                    _imageModeration.value = null
                 } else {
                     _error.value = result.exceptionOrNull()?.localizedMessage ?: "Submit failed"
                 }
@@ -93,6 +132,7 @@ class WasteViewModel(private val repository: WasteRepository = WasteRepository()
             try {
                 _isAnalyzing.value = true
                 _aiDescription.value = null
+                _imageModeration.value = null
                 _error.value = null
                 val model = GenerativeModel(
                     modelName = "gemini-2.0-flash",
@@ -105,11 +145,15 @@ class WasteViewModel(private val repository: WasteRepository = WasteRepository()
                             "You are a civic waste management assistant. " +
                             "Look at this image and write a clear, concise 1-2 sentence " +
                             "description of the waste issue for a complaint report. " +
-                            "Mention the type of waste and the severity."
+                            "Mention the type of waste and the severity. " +
+                            "Then in next line output this format exactly: SAFETY:<score_0_to_1>|<safe_or_unsafe>|<reason>. " +
+                            "Mark unsafe if image is unrelated, explicit, abusive, or not waste evidence."
                         )
                     }
                 )
-                _aiDescription.value = response.text?.trim()
+                val raw = response.text?.trim().orEmpty()
+                _aiDescription.value = raw.lineSequence().firstOrNull()?.trim().orEmpty()
+                _imageModeration.value = parseSafetyLine(raw)
             } catch (e: Exception) {
                 _error.value = "AI analysis failed: ${e.localizedMessage}"
             } finally {
@@ -118,5 +162,57 @@ class WasteViewModel(private val repository: WasteRepository = WasteRepository()
         }
     }
 
-    fun clearAiDescription() { _aiDescription.value = null }
+    fun approveReport(reportId: String, note: String = "Approved by admin") {
+        viewModelScope.launch(exceptionHandler) {
+            val adminId = FirebaseAuth.getInstance().currentUser?.uid ?: "admin"
+            val result = repository.updateModerationStatus(
+                reportId = reportId,
+                status = ReportModerationStatus.APPROVED,
+                moderatedBy = adminId,
+                note = note
+            )
+            if (result.isFailure) {
+                _error.value = result.exceptionOrNull()?.localizedMessage ?: "Approval failed"
+            }
+            fetchPendingReports()
+            fetchReports()
+        }
+    }
+
+    fun rejectReport(reportId: String, note: String = "Rejected by admin") {
+        viewModelScope.launch(exceptionHandler) {
+            val adminId = FirebaseAuth.getInstance().currentUser?.uid ?: "admin"
+            val result = repository.updateModerationStatus(
+                reportId = reportId,
+                status = ReportModerationStatus.REJECTED,
+                moderatedBy = adminId,
+                note = note
+            )
+            if (result.isFailure) {
+                _error.value = result.exceptionOrNull()?.localizedMessage ?: "Rejection failed"
+            }
+            fetchPendingReports()
+            fetchReports()
+        }
+    }
+
+    fun clearAiDescription() {
+        _aiDescription.value = null
+    }
+
+    private fun parseSafetyLine(raw: String): ImageModerationResult {
+        val line = raw.lineSequence().firstOrNull { it.trim().startsWith("SAFETY:", ignoreCase = true) }
+            ?.substringAfter("SAFETY:")
+            ?.trim()
+            .orEmpty()
+        val parts = line.split("|")
+        val score = parts.getOrNull(0)?.trim()?.toDoubleOrNull()?.coerceIn(0.0, 1.0) ?: 0.5
+        val label = parts.getOrNull(1)?.trim()?.lowercase().orEmpty().ifBlank {
+            if (score >= 0.60) "safe" else "unsafe"
+        }
+        val reason = parts.getOrNull(2)?.trim().orEmpty().ifBlank {
+            if (label == "safe") "Looks relevant to waste issue" else "Image is not clear waste evidence"
+        }
+        return ImageModerationResult(score = score, label = label, reason = reason)
+    }
 }

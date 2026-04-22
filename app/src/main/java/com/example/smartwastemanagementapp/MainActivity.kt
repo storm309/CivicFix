@@ -22,16 +22,22 @@ class MainActivity : ComponentActivity() {
             SmartWasteManagementAppTheme {
                 val navController = rememberNavController()
                 val authViewModel: AuthViewModel = viewModel()
+                val roleHomeDestination = if (authViewModel.isAdmin.value) {
+                    Screen.AdminDashboard.route
+                } else {
+                    Screen.Home.route
+                }
 
                 // Start directly at Login or Home to bypass splash screen hangs
-                val startDestination = if (authViewModel.isLoggedIn.value) Screen.Home.route else Screen.Login.route
+                val startDestination = if (authViewModel.isLoggedIn.value) roleHomeDestination else Screen.Login.route
 
                 NavHost(navController = navController, startDestination = startDestination) {
                     composable(Screen.Login.route) {
 
                         LoginScreen(
+                            viewModel = authViewModel,
                             onLoginSuccess = {
-                                navController.navigate(Screen.Home.route) {
+                                navController.navigate(roleHomeDestination) {
                                     popUpTo(Screen.Login.route) { inclusive = true }
                                 }
                             },
@@ -40,8 +46,9 @@ class MainActivity : ComponentActivity() {
                     }
                     composable(Screen.Signup.route) {
                         SignupScreen(
+                            viewModel = authViewModel,
                             onSignupSuccess = {
-                                navController.navigate(Screen.Home.route) {
+                                navController.navigate(roleHomeDestination) {
                                     popUpTo(Screen.Signup.route) { inclusive = true }
                                 }
                             },
@@ -49,17 +56,34 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                     composable(Screen.Home.route) {
-                        val authViewModel: AuthViewModel = viewModel()
                         HomeScreen(
                             onReportWaste = { navController.navigate(Screen.ReportWaste.route) },
                             onViewReports = { navController.navigate(Screen.ViewReports.route) },
                             onViewMap = { navController.navigate(Screen.Map.route) },
                             onLogout = {
+                                authViewModel.logout()
                                 navController.navigate(Screen.Login.route) {
                                     popUpTo(Screen.Home.route) { inclusive = true }
                                 }
                             },
                             authViewModel = authViewModel
+                        )
+                    }
+                    composable(Screen.AdminDashboard.route) {
+                        val wasteViewModel: WasteViewModel = viewModel()
+                        AdminDashboardScreen(
+                            onLogout = {
+                                authViewModel.logout()
+                                navController.navigate(Screen.Login.route) {
+                                    popUpTo(Screen.AdminDashboard.route) { inclusive = true }
+                                }
+                            },
+                            onBackToHome = {
+                                navController.navigate(Screen.Home.route) {
+                                    popUpTo(Screen.AdminDashboard.route)
+                                }
+                            },
+                            viewModel = wasteViewModel
                         )
                     }
                     composable(Screen.ReportWaste.route) {

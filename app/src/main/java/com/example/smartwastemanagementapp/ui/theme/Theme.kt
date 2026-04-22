@@ -2,11 +2,9 @@ package com.example.smartwastemanagementapp.ui.theme
 
 import android.app.Activity
 import android.os.Build
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
@@ -25,17 +23,17 @@ private val LightColorScheme = lightColorScheme(
     onTertiary             = Color.White,
     tertiaryContainer      = Amber90,
     onTertiaryContainer    = Amber10,
-    error                  = Color(0xFFBA1A1A),
+    error                  = Color(0xFFFF3B30),
     onError                = Color.White,
     errorContainer         = Color(0xFFFFDAD6),
     onErrorContainer       = Color(0xFF410002),
-    background             = Color(0xFFF4FEF7),
-    onBackground           = Color(0xFF191C1A),
-    surface                = Color(0xFFFCFDF9),
-    onSurface              = Color(0xFF191C1A),
-    surfaceVariant         = NeutralVar90,
-    onSurfaceVariant       = NeutralVar40,
-    outline                = Color(0xFF6F7973),
+    background             = Color(0xFFF7F8FA),
+    onBackground           = Color(0xFF111827),
+    surface                = Color(0xFFFFFFFF),
+    onSurface              = Color(0xFF111827),
+    surfaceVariant         = Color(0xFFF1F4F8),
+    onSurfaceVariant       = Color(0xFF6B7280),
+    outline                = Color(0xFFC9D1DC),
     outlineVariant         = NeutralVar80,
     scrim                  = Color(0xFF000000),
     inverseSurface         = Color(0xFF2D3130),
@@ -61,10 +59,10 @@ private val DarkColorScheme = darkColorScheme(
     onError                = Color(0xFF690005),
     errorContainer         = Color(0xFF93000A),
     onErrorContainer       = Color(0xFFFFDAD6),
-    background             = Color(0xFF191C1A),
-    onBackground           = Color(0xFFE1E3DF),
-    surface                = Color(0xFF191C1A),
-    onSurface              = Color(0xFFE1E3DF),
+    background             = Color(0xFF10131A),
+    onBackground           = Color(0xFFE7EAF0),
+    surface                = Color(0xFF161B23),
+    onSurface              = Color(0xFFE7EAF0),
     surfaceVariant         = NeutralVar40,
     onSurfaceVariant       = NeutralVar80,
     outline                = Color(0xFF8A9490),
@@ -76,7 +74,7 @@ private val DarkColorScheme = darkColorScheme(
 
 @Composable
 fun SmartWasteManagementAppTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    darkTheme: Boolean = false,
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {

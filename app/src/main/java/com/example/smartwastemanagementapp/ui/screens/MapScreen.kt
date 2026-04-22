@@ -3,7 +3,6 @@ package com.example.smartwastemanagementapp.ui.screens
 import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -17,7 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.smartwastemanagementapp.ui.theme.EcoGreen40
+import com.example.smartwastemanagementapp.model.ReportModerationStatus
 import com.example.smartwastemanagementapp.viewmodel.WasteViewModel
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
@@ -32,7 +31,10 @@ fun MapScreen(
     viewModel: WasteViewModel
 ) {
     val reports by viewModel.reports.collectAsState()
-    val validReports = reports.filter { it.latitude != 0.0 || it.longitude != 0.0 }
+    val validReports = reports.filter {
+        (it.latitude != 0.0 || it.longitude != 0.0) &&
+            ReportModerationStatus.from(it.moderationStatus) == ReportModerationStatus.APPROVED
+    }
 
     var locationPermissionGranted by remember { mutableStateOf(false) }
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -64,7 +66,7 @@ fun MapScreen(
                     Column {
                         Text("Waste Map", fontWeight = FontWeight.ExtraBold)
                         Text(
-                            "${validReports.size} locations pinned",
+                            "${validReports.size} approved locations pinned",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -97,15 +99,11 @@ fun MapScreen(
                 )
             ) {
                 validReports.forEach { report ->
-                    val isPending = report.status.equals("Pending", ignoreCase = true)
                     Marker(
                         state   = MarkerState(LatLng(report.latitude, report.longitude)),
                         title   = report.description.take(60).ifBlank { "Waste Report" },
-                        snippet = "Status: ${report.status}",
-                        icon    = BitmapDescriptorFactory.defaultMarker(
-                            if (isPending) BitmapDescriptorFactory.HUE_ORANGE
-                            else           BitmapDescriptorFactory.HUE_GREEN
-                        )
+                        snippet = "Status: Approved",
+                        icon    = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN)
                     )
                 }
             }
@@ -127,8 +125,7 @@ fun MapScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(Icons.Default.Map, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-                        LegendDot(Color(0xFFFF6D00), "Pending (${validReports.count { it.status.equals("Pending", true) }})")
-                        LegendDot(Color(0xFF2E7D32), "Cleaned (${validReports.count { it.status.equals("Cleaned", true) }})")
+                        LegendDot(Color(0xFF2E7D32), "Approved (${validReports.size})")
                     }
                 }
             }

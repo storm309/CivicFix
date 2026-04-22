@@ -9,10 +9,8 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
-import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -27,9 +25,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -41,7 +36,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import coil.compose.rememberAsyncImagePainter
-import com.example.smartwastemanagementapp.ui.theme.*
 import com.example.smartwastemanagementapp.viewmodel.WasteViewModel
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
@@ -64,6 +58,7 @@ fun ReportWasteScreen(
     var locationError by remember { mutableStateOf(false) }
 
     val aiDescription by viewModel.aiDescription
+    val moderationResult by viewModel.imageModeration
     val isAnalyzing   by viewModel.isAnalyzing
     val isLoading     by viewModel.isLoading
     val errorMsg      by viewModel.error
@@ -134,7 +129,7 @@ fun ReportWasteScreen(
                 .getBitmap(context.contentResolver, uri)
                 ?.copy(Bitmap.Config.ARGB_8888, false)
         }
-    } catch (e: Exception) { null }
+    } catch (_: Exception) { null }
 
     Scaffold(
         topBar = {
@@ -308,6 +303,35 @@ fun ReportWasteScreen(
                         Icon(Icons.Default.AutoAwesome, null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
                         Text("✨ Analyze with Gemini AI", fontWeight = FontWeight.SemiBold)
+                    }
+                }
+            }
+
+            moderationResult?.let { moderation ->
+                Spacer(Modifier.height(10.dp))
+                val isUnsafe = moderation.score < 0.60 || moderation.label.equals("unsafe", ignoreCase = true)
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    color = if (isUnsafe) {
+                        MaterialTheme.colorScheme.errorContainer
+                    } else {
+                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+                    }
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            text = if (isUnsafe) "AI safety check: blocked" else "AI safety check: passed",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = if (isUnsafe) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = "Confidence ${(moderation.score * 100).toInt()}% • ${moderation.reason}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }
