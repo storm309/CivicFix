@@ -17,7 +17,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
-private const val GEMINI_API_KEY = "AIzaSyBMGGfKztkvtlovWp27oj1GlrngN0DBLKc"
+private const val GEMINI_API_KEY = "AIzaSyBj6pzDh4J0FPE8Zm_-2DHUitNdi8C7CF0"
 
 data class ImageModerationResult(
     val score: Double,

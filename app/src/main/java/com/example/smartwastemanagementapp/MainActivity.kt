@@ -22,23 +22,34 @@ class MainActivity : ComponentActivity() {
             SmartWasteManagementAppTheme {
                 val navController = rememberNavController()
                 val authViewModel: AuthViewModel = viewModel()
-                val roleHomeDestination = if (authViewModel.isAdmin.value) {
-                    Screen.AdminDashboard.route
-                } else {
-                    Screen.Home.route
-                }
-
-                // Start directly at Login or Home to bypass splash screen hangs
-                val startDestination = if (authViewModel.isLoggedIn.value) roleHomeDestination else Screen.Login.route
-
-                NavHost(navController = navController, startDestination = startDestination) {
+                
+                NavHost(navController = navController, startDestination = Screen.Splash.route) {
+                    composable(Screen.Splash.route) {
+                        SplashScreen(
+                            onTimeout = {
+                                val isLoggedIn = authViewModel.isLoggedIn.value
+                                val isComplete = authViewModel.isProfileComplete.value
+                                
+                                if (!isLoggedIn) {
+                                    navController.navigate(Screen.Login.route) { popUpTo(0) }
+                                } else if (!isComplete) {
+                                    navController.navigate(Screen.CompleteProfile.route) { popUpTo(0) }
+                                } else {
+                                    val dest = if (authViewModel.isAdmin.value) Screen.AdminDashboard.route else Screen.Home.route
+                                    navController.navigate(dest) { popUpTo(0) }
+                                }
+                            }
+                        )
+                    }
                     composable(Screen.Login.route) {
-
                         LoginScreen(
                             viewModel = authViewModel,
                             onLoginSuccess = {
-                                navController.navigate(roleHomeDestination) {
-                                    popUpTo(Screen.Login.route) { inclusive = true }
+                                if (!authViewModel.isProfileComplete.value) {
+                                    navController.navigate(Screen.CompleteProfile.route) { popUpTo(Screen.Login.route) { inclusive = true } }
+                                } else {
+                                    val dest = if (authViewModel.isAdmin.value) Screen.AdminDashboard.route else Screen.Home.route
+                                    navController.navigate(dest) { popUpTo(Screen.Login.route) { inclusive = true } }
                                 }
                             },
                             onNavigateToSignup = { navController.navigate(Screen.Signup.route) }
@@ -48,11 +59,19 @@ class MainActivity : ComponentActivity() {
                         SignupScreen(
                             viewModel = authViewModel,
                             onSignupSuccess = {
-                                navController.navigate(roleHomeDestination) {
+                                navController.navigate(Screen.Home.route) {
                                     popUpTo(Screen.Signup.route) { inclusive = true }
                                 }
                             },
                             onNavigateToLogin = { navController.navigate(Screen.Login.route) }
+                        )
+                    }
+                    composable(Screen.CompleteProfile.route) {
+                        CompleteProfileScreen(
+                            viewModel = authViewModel,
+                            onComplete = {
+                                navController.navigate(Screen.Home.route) { popUpTo(0) }
+                            }
                         )
                     }
                     composable(Screen.Home.route) {
@@ -62,9 +81,7 @@ class MainActivity : ComponentActivity() {
                             onViewMap = { navController.navigate(Screen.Map.route) },
                             onLogout = {
                                 authViewModel.logout()
-                                navController.navigate(Screen.Login.route) {
-                                    popUpTo(Screen.Home.route) { inclusive = true }
-                                }
+                                navController.navigate(Screen.Login.route) { popUpTo(0) }
                             },
                             authViewModel = authViewModel
                         )
@@ -74,9 +91,7 @@ class MainActivity : ComponentActivity() {
                         AdminDashboardScreen(
                             onLogout = {
                                 authViewModel.logout()
-                                navController.navigate(Screen.Login.route) {
-                                    popUpTo(Screen.AdminDashboard.route) { inclusive = true }
-                                }
+                                navController.navigate(Screen.Login.route) { popUpTo(0) }
                             },
                             onBackToHome = {
                                 navController.navigate(Screen.Home.route) {

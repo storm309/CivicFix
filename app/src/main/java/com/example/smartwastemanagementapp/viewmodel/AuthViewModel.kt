@@ -5,8 +5,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import com.example.smartwastemanagementapp.model.AuthRole
 import com.example.smartwastemanagementapp.model.User
+import com.google.firebase.FirebaseException
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.GoogleAuthProvider
+import com.google.firebase.auth.PhoneAuthCredential
+import com.google.firebase.auth.PhoneAuthOptions
+import com.google.firebase.auth.PhoneAuthProvider
 import com.google.firebase.database.FirebaseDatabase
+import java.util.concurrent.TimeUnit
 
 class AuthViewModel : ViewModel() {
     private val auth = FirebaseAuth.getInstance()
@@ -28,6 +34,9 @@ class AuthViewModel : ViewModel() {
 
     private val _userProfile = mutableStateOf<User?>(null)
     val userProfile: State<User?> = _userProfile
+
+    private val _isProfileComplete = mutableStateOf(false)
+    val isProfileComplete: State<Boolean> = _isProfileComplete
 
     private val adminEmails = setOf("admin@civicfix.com")
 
@@ -121,41 +130,136 @@ class AuthViewModel : ViewModel() {
                 val dbUser = snapshot.getValue(User::class.java)
                 if (dbUser != null) {
                     _userProfile.value = dbUser
+                    _isProfileComplete.value = dbUser.name.isNotBlank() && dbUser.age.isNotBlank()
                 } else {
                     val current = _userProfile.value
                     if (current != null && current.uid == uid) {
                         database.child(uid).setValue(current)
+                        _isProfileComplete.value = true
+                    } else {
+                        _isProfileComplete.value = false
                     }
                 }
                 syncRoleFlags()
             }
             .addOnFailureListener {
-                // Non-fatal – user can still navigate the app
+                _isProfileComplete.value = false
             }
     }
 
-    fun startOtp(phoneNumber: String) {
-        _error.value = if (phoneNumber.isBlank()) {
-            "Enter phone number first"
-        } else {
-            "OTP login is scaffolded. Add Firebase PhoneAuth callbacks to enable verification."
+    fun updateProfile(name: String, age: String, gender: String, onSuccess: () -> Unit) {
+        val uid = auth.currentUser?.uid ?: return
+        val currentEmail = auth.currentUser?.email ?: ""
+        val currentPhone = auth.currentUser?.phoneNumber ?: ""
+        
+        val updatedUser = User(
+            uid = uid,
+            name = name,
+            email = currentEmail,
+            age = age,
+            phoneNumber = currentPhone,
+            gender = gender,
+            role = AuthRole.USER.dbValue,
+            authProvider = if (currentPhone.isNotBlank()) "phone" else "email"
+        )
+        
+        _isLoading.value = true
+        database.child(uid).setValue(updatedUser)
+            .addOnCompleteListener { task ->
+                _isLoading.value = false
+                if (task.isSuccessful) {
+                    _userProfile.value = updatedUser
+                    _isProfileComplete.value = true
+                    onSuccess()
+                } else {
+                    _error.value = task.exception?.message
+                }
+            }
+    }
+
+    private var verificationId: String? = null
+
+    fun startOtp(phoneNumber: String, activity: android.app.Activity) {
+        if (phoneNumber.isBlank()) {
+            _error.value = "Enter phone number first"
+            return
         }
+        
+        _isLoading.value = true
+        _error.value = null
+        
+        val options = PhoneAuthOptions.newBuilder(auth)
+            .setPhoneNumber("+91$phoneNumber")
+            .setTimeout(60L, TimeUnit.SECONDS)
+            .setActivity(activity)
+            .setCallbacks(object : PhoneAuthProvider.OnVerificationStateChangedCallbacks() {
+                override fun onVerificationCompleted(credential: PhoneAuthCredential) {
+                    signInWithPhoneCredential(credential)
+                }
+
+                override fun onVerificationFailed(e: FirebaseException) {
+                    _isLoading.value = false
+                    _error.value = e.message
+                }
+
+                override fun onCodeSent(verId: String, token: PhoneAuthProvider.ForceResendingToken) {
+                    _isLoading.value = false
+                    verificationId = verId
+                }
+            })
+            .build()
+        PhoneAuthProvider.verifyPhoneNumber(options)
     }
 
     fun verifyOtp(code: String) {
-        _error.value = if (code.isBlank()) {
-            "Enter OTP code"
-        } else {
-            "OTP verification is scaffolded. Connect verificationId + credential flow."
+        if (code.isBlank() || verificationId == null) {
+            _error.value = "Enter valid OTP"
+            return
         }
+        val credential = PhoneAuthProvider.getCredential(verificationId!!, code)
+        signInWithPhoneCredential(credential)
+    }
+
+    private fun signInWithPhoneCredential(credential: PhoneAuthCredential) {
+        _isLoading.value = true
+        auth.signInWithCredential(credential)
+            .addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    val uid = task.result.user?.uid ?: ""
+                    fetchUserProfile(uid)
+                    _isLoggedIn.value = true
+                    _isLoading.value = false
+                } else {
+                    _isLoading.value = false
+                    _error.value = task.exception?.message
+                }
+            }
     }
 
     fun signInWithGoogleToken(idToken: String, onSuccess: () -> Unit) {
-        _error.value = if (idToken.isBlank()) {
-            "Missing Google token"
-        } else {
-            "Google sign-in scaffold added. Connect Google credential sign-in to enable this button."
+        if (idToken.isBlank()) {
+            _error.value = "Google Sign-In failed: Empty Token"
+            return
         }
+        
+        _isLoading.value = true
+        val credential = GoogleAuthProvider.getCredential(idToken, null)
+        auth.signInWithCredential(credential)
+            .addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    val firebaseUser = task.result.user
+                    val uid = firebaseUser?.uid.orEmpty()
+                    
+                    // If user is new or profile missing, fetchUserProfile will set isProfileComplete to false
+                    fetchUserProfile(uid)
+                    _isLoggedIn.value = true
+                    _isLoading.value = false
+                    onSuccess()
+                } else {
+                    _isLoading.value = false
+                    _error.value = task.exception?.message ?: "Google Sign-In Failed"
+                }
+            }
     }
 
     fun logout() {

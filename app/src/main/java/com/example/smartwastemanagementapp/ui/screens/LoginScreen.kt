@@ -1,43 +1,42 @@
 package com.example.smartwastemanagementapp.ui.screens
 
+import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.Phone
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.credentials.CredentialManager
+import androidx.credentials.GetCredentialRequest
+import androidx.credentials.GetCredentialResponse
+import androidx.credentials.exceptions.GetCredentialException
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.smartwastemanagementapp.R
 import com.example.smartwastemanagementapp.ui.theme.*
 import com.example.smartwastemanagementapp.viewmodel.AuthViewModel
+import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import kotlinx.coroutines.launch
 
 @Composable
 fun LoginScreen(
@@ -45,51 +44,28 @@ fun LoginScreen(
     onNavigateToSignup: () -> Unit,
     viewModel: AuthViewModel = viewModel()
 ) {
-    var email          by remember { mutableStateOf("") }
-    var password       by remember { mutableStateOf("") }
-    var passwordVisible by remember { mutableStateOf(false) }
-    val focusManager   = LocalFocusManager.current
-    val scrollState    = rememberScrollState()
+    var isOtpMode by remember { mutableStateOf(false) }
+    var email     by remember { mutableStateOf("") }
+    var password  by remember { mutableStateOf("") }
+    var phone     by remember { mutableStateOf("") }
+    var otpCode   by remember { mutableStateOf("") }
+    var isOtpSent by remember { mutableStateOf(false) }
 
-    // Entrance animation
-    val cardAlpha by animateFloatAsState(
-        targetValue = 1f,
-        animationSpec = tween(600, easing = FastOutSlowInEasing),
-        label = "card_alpha"
-    )
-    val cardOffset by animateFloatAsState(
-        targetValue = 0f,
-        animationSpec = tween(600, easing = FastOutSlowInEasing),
-        label = "card_offset"
-    )
+    val context = LocalContext.current
+    val activity = context as? android.app.Activity
+    val scope = rememberCoroutineScope()
+
+    var passwordVisible by remember { mutableStateOf(false) }
+    val scrollState     = rememberScrollState()
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // ── Gradient header (top 38%) ────────────────────────────
+        // Gradient header
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .fillMaxHeight(0.38f)
-                .background(
-                    Brush.verticalGradient(listOf(EcoGreen40, EcoGreen50, Teal40))
-                )
-        ) {
-            // Decorative circles
-            Box(
-                modifier = Modifier
-                    .size(180.dp)
-                    .offset(x = (-40).dp, y = (-40).dp)
-                    .alpha(0.12f)
-                    .background(Color.White, RoundedCornerShape(50))
-            )
-            Box(
-                modifier = Modifier
-                    .size(120.dp)
-                    .align(Alignment.BottomEnd)
-                    .offset(x = 30.dp, y = 40.dp)
-                    .alpha(0.08f)
-                    .background(Color.White, RoundedCornerShape(50))
-            )
-        }
+                .background(Brush.verticalGradient(listOf(EcoGreen40, EcoGreen50, Teal40)))
+        )
 
         Column(
             modifier = Modifier
@@ -99,167 +75,153 @@ fun LoginScreen(
                 .imePadding(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // ── Logo + Title in gradient area ─────────────────────
-            Spacer(Modifier.height(40.dp))
+            Spacer(Modifier.height(48.dp))
 
-            Box(
-                modifier = Modifier
-                    .size(88.dp)
-                    .shadow(elevation = 16.dp, shape = RoundedCornerShape(24.dp))
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(Color.White),
-                contentAlignment = Alignment.Center
+            Surface(
+                modifier = Modifier.size(80.dp),
+                shape = RoundedCornerShape(20.dp),
+                shadowElevation = 12.dp
             ) {
                 Image(
                     painter = painterResource(R.drawable.app_logo),
-                    contentDescription = "Logo",
-                    modifier = Modifier.size(60.dp).padding(4.dp),
-                    contentScale = ContentScale.Fit
+                    contentDescription = null,
+                    modifier = Modifier.padding(12.dp)
                 )
             }
 
             Spacer(Modifier.height(12.dp))
 
-            Text(
-                text  = "CivicFix",
-                style = MaterialTheme.typography.headlineMedium.copy(
-                    fontWeight = FontWeight.ExtraBold,
-                    letterSpacing = (-0.5).sp
-                ),
-                color = Color.White
-            )
-            Text(
-                text  = "Smart Civic Waste Management",
-                style = MaterialTheme.typography.bodyMedium,
-                color = Color.White.copy(alpha = 0.8f)
-            )
+            Text("CivicFix", style = MaterialTheme.typography.headlineMedium, color = Color.White, fontWeight = FontWeight.Bold)
+            Text("Login to your account", color = Color.White.copy(0.8f))
 
             Spacer(Modifier.height(32.dp))
 
-            // ── Floating card ─────────────────────────────────────
             Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp)
-                    .offset(y = cardOffset.dp)
-                    .alpha(cardAlpha),
-                shape     = RoundedCornerShape(28.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 12.dp),
-                colors    = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                modifier = Modifier.padding(horizontal = 24.dp).fillMaxWidth(),
+                shape = RoundedCornerShape(32.dp),
+                elevation = CardDefaults.cardElevation(8.dp)
             ) {
-                Column(
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 28.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text  = "Welcome Back 👋",
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text  = "Login to continue",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 4.dp, bottom = 24.dp)
-                    )
-
-                    // Email field
-                    OutlinedTextField(
-                        value    = email,
-                        onValueChange = { email = it.trim() },
-                        label    = { Text("Email Address") },
-                        placeholder = { Text("example@mail.com") },
-                        leadingIcon = {
-                            Icon(Icons.Default.Email, null, tint = MaterialTheme.colorScheme.primary)
-                        },
-                        modifier  = Modifier.fillMaxWidth(),
-                        shape     = RoundedCornerShape(14.dp),
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.Email,
-                            imeAction    = ImeAction.Next
-                        ),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor   = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                            focusedLabelColor    = MaterialTheme.colorScheme.primary
-                        )
-                    )
-
-                    Spacer(Modifier.height(14.dp))
-
-                    // Password field
-                    OutlinedTextField(
-                        value    = password,
-                        onValueChange = { password = it },
-                        label    = { Text("Password") },
-                        leadingIcon = {
-                            Icon(Icons.Default.Lock, null, tint = MaterialTheme.colorScheme.primary)
-                        },
-                        trailingIcon = {
-                            IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                                Icon(
-                                    imageVector = if (passwordVisible) Icons.Default.Visibility
-                                                  else Icons.Default.VisibilityOff,
-                                    contentDescription = if (passwordVisible) "Hide" else "Show"
-                                )
-                            }
-                        },
-                        visualTransformation = if (passwordVisible) VisualTransformation.None
-                                               else PasswordVisualTransformation(),
-                        modifier  = Modifier.fillMaxWidth(),
-                        shape     = RoundedCornerShape(14.dp),
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.Password,
-                            imeAction    = ImeAction.Done
-                        ),
-                        keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor   = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                            focusedLabelColor    = MaterialTheme.colorScheme.primary
-                        )
-                    )
-
-                    // Error
-                    viewModel.error.value?.let { err ->
-                        Spacer(Modifier.height(8.dp))
-                        Surface(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(10.dp),
-                            color = MaterialTheme.colorScheme.errorContainer
-                        ) {
-                            Text(
-                                text  = err,
-                                color = MaterialTheme.colorScheme.error,
-                                style = MaterialTheme.typography.bodySmall,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                Column(modifier = Modifier.padding(24.dp)) {
+                    // Mode Switcher
+                    TabRow(
+                        selectedTabIndex = if (isOtpMode) 1 else 0,
+                        containerColor = Color.Transparent,
+                        contentColor = MaterialTheme.colorScheme.primary,
+                        divider = {},
+                        indicator = { tabPositions ->
+                            TabRowDefaults.SecondaryIndicator(
+                                Modifier.tabIndicatorOffset(tabPositions[if (isOtpMode) 1 else 0]),
+                                color = MaterialTheme.colorScheme.primary
                             )
+                        }
+                    ) {
+                        Tab(selected = !isOtpMode, onClick = { isOtpMode = false }) {
+                            Text("Email", modifier = Modifier.padding(vertical = 12.dp))
+                        }
+                        Tab(selected = isOtpMode, onClick = { isOtpMode = true }) {
+                            Text("Phone / OTP", modifier = Modifier.padding(vertical = 12.dp))
                         }
                     }
 
                     Spacer(Modifier.height(24.dp))
 
-                    // Login button
+                    AnimatedContent(targetState = isOtpMode, label = "mode") { mode ->
+                        if (!mode) {
+                            // Email Mode
+                            Column {
+                                OutlinedTextField(
+                                    value = email,
+                                    onValueChange = { email = it },
+                                    label = { Text("Email") },
+                                    leadingIcon = { Icon(Icons.Default.Email, null) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(14.dp)
+                                )
+                                Spacer(Modifier.height(12.dp))
+                                OutlinedTextField(
+                                    value = password,
+                                    onValueChange = { password = it },
+                                    label = { Text("Password") },
+                                    leadingIcon = { Icon(Icons.Default.Lock, null) },
+                                    visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                                    trailingIcon = {
+                                        IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                                            Icon(if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff, null)
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(14.dp)
+                                )
+                            }
+                        } else {
+                            // OTP Mode
+                            Column {
+                                if (!isOtpSent) {
+                                    OutlinedTextField(
+                                        value = phone,
+                                        onValueChange = { if (it.length <= 10) phone = it },
+                                        label = { Text("Phone Number") },
+                                        prefix = { Text("+91 ") },
+                                        leadingIcon = { Icon(Icons.Default.Phone, null) },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(14.dp),
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone)
+                                    )
+                                } else {
+                                    Text("OTP sent to +91 $phone", style = MaterialTheme.typography.labelMedium)
+                                    Spacer(Modifier.height(8.dp))
+                                    OutlinedTextField(
+                                        value = otpCode,
+                                        onValueChange = { if (it.length <= 6) otpCode = it },
+                                        label = { Text("Enter 6-digit OTP") },
+                                        leadingIcon = { Icon(Icons.Default.VpnKey, null) },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(14.dp),
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                                    )
+                                    TextButton(onClick = { isOtpSent = false }, modifier = Modifier.align(Alignment.End)) {
+                                        Text("Change Number")
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    viewModel.error.value?.let { err ->
+                        Text(err, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
+                    }
+
+                    Spacer(Modifier.height(24.dp))
+
                     if (viewModel.isLoading.value) {
-                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                        CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
                     } else {
                         Button(
-                            onClick = { viewModel.login(email, password, onLoginSuccess) },
+                            onClick = {
+                                if (!isOtpMode) {
+                                    viewModel.login(email, password, onLoginSuccess)
+                                } else {
+                                    if (!isOtpSent) {
+                                        if (activity != null) {
+                                            viewModel.startOtp(phone, activity)
+                                            isOtpSent = true
+                                        }
+                                    } else {
+                                        viewModel.verifyOtp(otpCode)
+                                    }
+                                }
+                            },
                             modifier = Modifier.fillMaxWidth().height(54.dp),
-                            shape = RoundedCornerShape(14.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primary
-                            ),
-                            elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
+                            shape = RoundedCornerShape(14.dp)
                         ) {
-                            Text(
-                                "Login",
-                                fontSize   = 17.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 0.5.sp
-                            )
+                            Text(if (!isOtpMode) "Login" else if (!isOtpSent) "Send OTP" else "Verify OTP")
+                        }
+
+                        // Monitor Login Success for OTP
+                        LaunchedEffect(viewModel.isLoggedIn.value) {
+                            if (viewModel.isLoggedIn.value) {
+                                onLoginSuccess()
+                            }
                         }
                     }
 
@@ -272,14 +234,34 @@ fun LoginScreen(
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         OutlinedButton(
-                            onClick = { viewModel.signInWithGoogleToken("", onLoginSuccess) },
+                            onClick = {
+                                val credentialManager = CredentialManager.create(context)
+                                val googleIdOption = GetGoogleIdOption.Builder()
+                                    .setFilterByAuthorizedAccounts(false)
+                                    .setServerClientId("923838274395-5m3f2n1p6n9m8v7b4v5n3n2p1n0m9v8b.apps.googleusercontent.com")
+                                    .setAutoSelectEnabled(true)
+                                    .build()
+
+                                val request = GetCredentialRequest.Builder()
+                                    .addCredentialOption(googleIdOption)
+                                    .build()
+
+                                scope.launch {
+                                    try {
+                                        val result = credentialManager.getCredential(context = context, request = request)
+                                        handleGoogleSignInResult(result, viewModel, onLoginSuccess)
+                                    } catch (e: GetCredentialException) {
+                                        // Handle cancellation or error
+                                    }
+                                }
+                            },
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(12.dp)
                         ) {
                             Text("Google")
                         }
                         OutlinedButton(
-                            onClick = { viewModel.startOtp("") },
+                            onClick = { isOtpMode = true },
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(12.dp)
                         ) {
@@ -291,23 +273,24 @@ fun LoginScreen(
 
                     Spacer(Modifier.height(10.dp))
 
-                    TextButton(onClick = onNavigateToSignup) {
-                        Text(
-                            text       = "Don't have an account? ",
-                            color      = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style      = MaterialTheme.typography.bodyMedium
-                        )
-                        Text(
-                            text       = "Sign Up",
-                            color      = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Bold,
-                            style      = MaterialTheme.typography.bodyMedium
-                        )
+                    TextButton(onClick = onNavigateToSignup, modifier = Modifier.fillMaxWidth()) {
+                        Text("New here? Create an account", color = MaterialTheme.colorScheme.primary)
                     }
                 }
             }
-
             Spacer(Modifier.height(32.dp))
         }
+    }
+}
+
+private fun handleGoogleSignInResult(
+    result: GetCredentialResponse,
+    viewModel: AuthViewModel,
+    onLoginSuccess: () -> Unit
+) {
+    val credential = result.credential
+    if (credential is com.google.android.libraries.identity.googleid.GoogleIdTokenCredential) {
+        val idToken = credential.idToken
+        viewModel.signInWithGoogleToken(idToken, onLoginSuccess)
     }
 }

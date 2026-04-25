@@ -9,4 +9,5 @@ sealed class Screen(val route: String) {
     object ReportWaste : Screen("report_waste")
     object ViewReports : Screen("view_reports")
     object Map : Screen("map")
+    object CompleteProfile : Screen("complete_profile")
 }

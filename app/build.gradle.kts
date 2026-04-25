@@ -62,6 +62,10 @@ dependencies {
 
     // Google Maps & Location
     implementation(libs.play.services.maps)
+    implementation(libs.play.services.auth)
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services.auth)
+    implementation(libs.googleid)
     implementation(libs.maps.compose)
     implementation(libs.play.services.location)
 
