@@ -3,6 +3,7 @@ package com.example.smartwastemanagementapp.viewmodel
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
+import com.example.smartwastemanagementapp.BuildConfig
 import com.example.smartwastemanagementapp.model.AuthRole
 import com.example.smartwastemanagementapp.model.User
 import com.google.firebase.FirebaseException
@@ -46,34 +47,63 @@ class AuthViewModel : ViewModel() {
 
     fun login(email: String, pass: String, onSuccess: () -> Unit) {
         if (email.isBlank() || pass.isBlank()) {
-            _error.value = "Please fill all fields"
+            _error.value = "❌ Please enter email and password"
             return
         }
         _isLoading.value = true
         _error.value = null
-        auth.signInWithEmailAndPassword(email, pass)
-            .addOnCompleteListener { task ->
-                if (task.isSuccessful) {
-                    val firebaseUser = task.result.user
-                    val uid = firebaseUser?.uid.orEmpty()
-                    val provisionalRole = if (isAdminEmail(firebaseUser?.email)) AuthRole.ADMIN else AuthRole.USER
-                    _userProfile.value = User(
-                        uid = uid,
-                        name = firebaseUser?.displayName.orEmpty(),
-                        email = firebaseUser?.email.orEmpty(),
-                        role = provisionalRole.dbValue,
-                        authProvider = "email"
-                    )
-                    fetchUserProfile(uid)
-                    _isLoggedIn.value = true
-                    syncRoleFlags()
+
+        try {
+            auth.signInWithEmailAndPassword(email, pass)
+                .addOnCompleteListener { task ->
                     _isLoading.value = false
-                    onSuccess()
-                } else {
-                    _isLoading.value = false
-                    _error.value = task.exception?.message ?: "Login Failed"
+
+                    if (task.isSuccessful) {
+                        val firebaseUser = task.result.user
+                        val uid = firebaseUser?.uid.orEmpty()
+                        val provisionalRole = if (isAdminEmail(firebaseUser?.email)) AuthRole.ADMIN else AuthRole.USER
+                        _userProfile.value = User(
+                            uid = uid,
+                            name = firebaseUser?.displayName.orEmpty(),
+                            email = firebaseUser?.email.orEmpty(),
+                            role = provisionalRole.dbValue,
+                            authProvider = "email"
+                        )
+                        fetchUserProfile(uid)
+                        _isLoggedIn.value = true
+                        syncRoleFlags()
+                        onSuccess()
+                    } else {
+                        val errorMsg = when {
+                            task.exception?.message?.contains("PERMISSION_DENIED") == true ->
+                                "❌ Permission denied - Check app permissions"
+                            task.exception?.message?.contains("NETWORK") == true ||
+                            task.exception?.message?.contains("IOException") == true ->
+                                "❌ Network error - Check internet connection"
+                            task.exception?.message?.contains("invalid") == true ->
+                                "❌ Invalid email or password"
+                            task.exception?.message?.contains("disabled") == true ->
+                                "❌ Account disabled by administrator"
+                            task.exception?.message?.contains("TOO_MANY") == true ->
+                                "❌ Too many login attempts - Try later"
+                            else -> task.exception?.message ?: "❌ Login Failed"
+                        }
+                        _error.value = errorMsg
+                    }
                 }
-            }
+        } catch (e: java.net.ConnectException) {
+            _isLoading.value = false
+            _error.value = "❌ Cannot connect - Check internet connection"
+        } catch (e: java.net.SocketTimeoutException) {
+            _isLoading.value = false
+            _error.value = "❌ Connection timeout - Your internet is slow"
+        } catch (e: java.io.IOException) {
+            _isLoading.value = false
+            _error.value = "❌ Network error - Check WiFi/mobile data"
+        } catch (e: Exception) {
+            _isLoading.value = false
+            _error.value = "❌ Error: ${e.localizedMessage?.take(60) ?: "Try again"}"
+        }
     }
 
     fun signUp(
@@ -237,29 +267,103 @@ class AuthViewModel : ViewModel() {
     }
 
     fun signInWithGoogleToken(idToken: String, onSuccess: () -> Unit) {
+        android.util.Log.d("AuthViewModel", "Google sign-in started with token")
         if (idToken.isBlank()) {
-            _error.value = "Google Sign-In failed: Empty Token"
+            _error.value = "❌ No Google account selected. Please try again."
             return
         }
         
         _isLoading.value = true
-        val credential = GoogleAuthProvider.getCredential(idToken, null)
-        auth.signInWithCredential(credential)
-            .addOnCompleteListener { task ->
-                if (task.isSuccessful) {
-                    val firebaseUser = task.result.user
-                    val uid = firebaseUser?.uid.orEmpty()
-                    
-                    // If user is new or profile missing, fetchUserProfile will set isProfileComplete to false
-                    fetchUserProfile(uid)
-                    _isLoggedIn.value = true
+        _error.value = null
+
+        try {
+            val credential = GoogleAuthProvider.getCredential(idToken, null)
+            auth.signInWithCredential(credential)
+                .addOnCompleteListener { task ->
                     _isLoading.value = false
-                    onSuccess()
-                } else {
-                    _isLoading.value = false
-                    _error.value = task.exception?.message ?: "Google Sign-In Failed"
+
+                    if (task.isSuccessful) {
+                        android.util.Log.d("AuthViewModel", "Firebase Auth Successful")
+                        val firebaseUser = task.result.user
+                        if (firebaseUser == null) {
+                            _error.value = "❌ User data not available. Check internet and try again."
+                            _isLoggedIn.value = false
+                            return@addOnCompleteListener
+                        }
+
+                        val uid = firebaseUser.uid
+                        val email = firebaseUser.email.orEmpty()
+                        val displayName = firebaseUser.displayName.orEmpty()
+
+                        // Update local state immediately
+                        val newUser = User(
+                            uid = uid,
+                            name = displayName,
+                            email = email,
+                            role = if (isAdminEmail(email)) AuthRole.ADMIN.dbValue else AuthRole.USER.dbValue,
+                            authProvider = "google"
+                        )
+                        
+                        _userProfile.value = newUser
+                        _isLoggedIn.value = true
+                        syncRoleFlags()
+                        
+                        android.util.Log.d("AuthViewModel", "State updated, triggering onSuccess")
+                        onSuccess() // Navigate immediately
+
+                        // Update database in background
+                        database.child(uid).setValue(newUser)
+                            .addOnCompleteListener { dbTask ->
+                                if (!dbTask.isSuccessful) {
+                                    android.util.Log.e("AuthViewModel", "Database save failed: ${dbTask.exception?.message}")
+                                } else {
+                                    android.util.Log.d("AuthViewModel", "Database save successful")
+                                }
+                            }
+                    } else {
+                        val exception = task.exception
+                        android.util.Log.e("AuthViewModel", "Firebase Auth Failed: ${exception?.message}")
+                        val errorMsg = when {
+                            exception?.message?.contains("NETWORK_ERROR") == true ->
+                                "❌ Network error - Check WiFi/mobile data"
+                            exception?.message?.contains("INVALID_IDP_RESPONSE") == true ->
+                                "❌ Invalid token - Try again"
+                            exception?.message?.contains("CREDENTIAL_MISMATCH") == true ->
+                                "❌ Account mismatch - Use same Gmail"
+                            exception?.message?.contains("TOO_MANY_ATTEMPTS") == true ->
+                                "❌ Too many attempts - Wait 5 mins"
+                            exception?.message?.contains("NETWORK") == true ||
+                            exception?.message?.contains("IOException") == true ||
+                            exception?.message?.contains("Connection") == true ->
+                                "❌ Network issue - Check WiFi/mobile data"
+                            exception?.message?.contains("PERMISSION") == true ->
+                                "❌ Permission denied - Check app settings"
+                            exception?.message != null ->
+                                "❌ Error: ${exception.message?.take(60)}"
+                            else ->
+                                "❌ Sign-in failed - Check internet & setup"
+                        }
+                        _error.value = errorMsg
+                        _isLoggedIn.value = false
+                    }
                 }
-            }
+        } catch (e: java.net.SocketTimeoutException) {
+            _isLoading.value = false
+            _error.value = "❌ Connection timeout - Internet too slow"
+        } catch (e: java.net.ConnectException) {
+            _isLoading.value = false
+            _error.value = "❌ Cannot connect - Check internet"
+        } catch (e: java.io.IOException) {
+            _isLoading.value = false
+            _error.value = "❌ Network error - Turn on WiFi/data"
+        } catch (e: Exception) {
+            _isLoading.value = false
+            _error.value = "❌ Error: ${e.localizedMessage?.take(100) ?: "Unknown - try again"}"
+        }
+    }
+
+    fun getGoogleClientId(): String {
+        return BuildConfig.GOOGLE_WEB_CLIENT_ID
     }
 
     fun logout() {

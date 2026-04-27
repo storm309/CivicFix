@@ -6,6 +6,7 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.smartwastemanagementapp.BuildConfig
 import com.example.smartwastemanagementapp.model.ReportModerationStatus
 import com.example.smartwastemanagementapp.model.WasteReport
 import com.example.smartwastemanagementapp.repository.WasteRepository
@@ -16,8 +17,6 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-
-private const val GEMINI_API_KEY = "AIzaSyBj6pzDh4J0FPE8Zm_-2DHUitNdi8C7CF0"
 
 data class ImageModerationResult(
     val score: Double,
@@ -136,7 +135,7 @@ class WasteViewModel(private val repository: WasteRepository = WasteRepository()
                 _error.value = null
                 val model = GenerativeModel(
                     modelName = "gemini-2.0-flash",
-                    apiKey = GEMINI_API_KEY
+                    apiKey = BuildConfig.GEMINI_API_KEY
                 )
                 val response = model.generateContent(
                     content {

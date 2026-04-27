@@ -1,9 +1,21 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.google.services)
 }
+
+val localProps = Properties().apply {
+    val localPropsFile = rootProject.file("local.properties")
+    if (localPropsFile.exists()) {
+        localPropsFile.inputStream().use { load(it) }
+    }
+}
+
+fun readLocalProperty(key: String): String =
+    localProps.getProperty(key)?.trim().orEmpty()
 
 android {
     namespace = "com.example.smartwastemanagementapp"
@@ -17,6 +29,11 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        buildConfigField("String", "GEMINI_API_KEY", "\"${readLocalProperty("GEMINI_API_KEY")}\"")
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"${readLocalProperty("GOOGLE_WEB_CLIENT_ID")}\"")
+
+        manifestPlaceholders["MAPS_API_KEY"] = readLocalProperty("MAPS_API_KEY")
     }
 
     buildTypes {
@@ -37,6 +54,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 

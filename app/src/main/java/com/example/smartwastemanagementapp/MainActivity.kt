@@ -45,11 +45,22 @@ class MainActivity : ComponentActivity() {
                         LoginScreen(
                             viewModel = authViewModel,
                             onLoginSuccess = {
+                                android.util.Log.d("MainActivity", "Login Success Callback Triggered")
+                                android.util.Log.d("MainActivity", "isLoggedIn: ${authViewModel.isLoggedIn.value}")
+                                android.util.Log.d("MainActivity", "isAdmin: ${authViewModel.isAdmin.value}")
+                                android.util.Log.d("MainActivity", "isProfileComplete: ${authViewModel.isProfileComplete.value}")
+                                
                                 if (!authViewModel.isProfileComplete.value) {
-                                    navController.navigate(Screen.CompleteProfile.route) { popUpTo(Screen.Login.route) { inclusive = true } }
+                                    android.util.Log.d("MainActivity", "Navigating to Complete Profile")
+                                    navController.navigate(Screen.CompleteProfile.route) { 
+                                        popUpTo(Screen.Login.route) { inclusive = true } 
+                                    }
                                 } else {
                                     val dest = if (authViewModel.isAdmin.value) Screen.AdminDashboard.route else Screen.Home.route
-                                    navController.navigate(dest) { popUpTo(Screen.Login.route) { inclusive = true } }
+                                    android.util.Log.d("MainActivity", "Navigating to: $dest")
+                                    navController.navigate(dest) { 
+                                        popUpTo(Screen.Login.route) { inclusive = true } 
+                                    }
                                 }
                             },
                             onNavigateToSignup = { navController.navigate(Screen.Signup.route) }

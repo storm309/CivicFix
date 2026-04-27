@@ -2,6 +2,7 @@ package com.example.smartwastemanagementapp.ui.screens
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -26,14 +27,23 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.credentials.CredentialManager
+import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.GetCredentialResponse
 import androidx.credentials.exceptions.GetCredentialException
+import androidx.credentials.exceptions.NoCredentialException
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.smartwastemanagementapp.R
 import com.example.smartwastemanagementapp.ui.theme.*
 import com.example.smartwastemanagementapp.viewmodel.AuthViewModel
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.ApiException
+import com.google.android.gms.common.ConnectionResult
+import com.google.android.gms.common.GoogleApiAvailability
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import kotlinx.coroutines.launch
@@ -57,6 +67,42 @@ fun LoginScreen(
 
     var passwordVisible by remember { mutableStateOf(false) }
     val scrollState     = rememberScrollState()
+    var isGoogleLoading by remember { mutableStateOf(false) }
+    var googleError by remember { mutableStateOf<String?>(null) }
+
+    val googleSignInLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode != android.app.Activity.RESULT_OK) {
+            isGoogleLoading = false
+            googleError = "Sign-in cancelled - Please select a Google account"
+            return@rememberLauncherForActivityResult
+        }
+
+        val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+        try {
+            val account = task.getResult(ApiException::class.java)
+            val idToken = account.idToken.orEmpty()
+            if (idToken.isBlank()) {
+                isGoogleLoading = false
+                googleError = "Google token not received. Check Firebase Web Client ID setup."
+            } else {
+                viewModel.signInWithGoogleToken(idToken) {
+                    isGoogleLoading = false
+                    onLoginSuccess()
+                }
+            }
+        } catch (e: ApiException) {
+            isGoogleLoading = false
+            googleError = when (e.statusCode) {
+                7 -> "Network error - Check WiFi/mobile data"
+                10 -> "Developer error - SHA-1 or Web Client ID mismatch"
+                12500 -> "Google Sign-In setup issue in Firebase Console"
+                12501 -> "Sign-in cancelled"
+                else -> "Google Sign-In failed (code ${e.statusCode})"
+            }
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         // Gradient header
@@ -217,9 +263,9 @@ fun LoginScreen(
                             Text(if (!isOtpMode) "Login" else if (!isOtpSent) "Send OTP" else "Verify OTP")
                         }
 
-                        // Monitor Login Success for OTP
-                        LaunchedEffect(viewModel.isLoggedIn.value) {
-                            if (viewModel.isLoggedIn.value) {
+                        // OTP flow has no callback, so navigate after auth only in OTP mode.
+                        LaunchedEffect(viewModel.isLoggedIn.value, isOtpMode) {
+                            if (isOtpMode && viewModel.isLoggedIn.value) {
                                 onLoginSuccess()
                             }
                         }
@@ -229,45 +275,202 @@ fun LoginScreen(
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     Spacer(Modifier.height(16.dp))
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        OutlinedButton(
+                    LaunchedEffect(viewModel.error.value) {
+                        if (isGoogleLoading && viewModel.error.value != null) {
+                            googleError = viewModel.error.value
+                            isGoogleLoading = false
+                        }
+                    }
+
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        // Gmail Sign-In Button
+                        Button(
                             onClick = {
-                                val credentialManager = CredentialManager.create(context)
-                                val googleIdOption = GetGoogleIdOption.Builder()
-                                    .setFilterByAuthorizedAccounts(false)
-                                    .setServerClientId("923838274395-5m3f2n1p6n9m8v7b4v5n3n2p1n0m9v8b.apps.googleusercontent.com")
-                                    .setAutoSelectEnabled(true)
-                                    .build()
+                                // Check internet first
+                                if (!isInternetAvailable(context)) {
+                                    googleError = "❌ No internet connection found. Turn on WiFi or mobile data."
+                                    return@Button
+                                }
 
-                                val request = GetCredentialRequest.Builder()
-                                    .addCredentialOption(googleIdOption)
-                                    .build()
-
-                                scope.launch {
-                                    try {
-                                        val result = credentialManager.getCredential(context = context, request = request)
-                                        handleGoogleSignInResult(result, viewModel, onLoginSuccess)
-                                    } catch (e: GetCredentialException) {
-                                        // Handle cancellation or error
+                                val playServicesStatus = GoogleApiAvailability.getInstance()
+                                    .isGooglePlayServicesAvailable(context)
+                                if (playServicesStatus != ConnectionResult.SUCCESS) {
+                                    googleError = "Google Play Services unavailable. Update Play Services and retry."
+                                    if (activity != null && GoogleApiAvailability.getInstance().isUserResolvableError(playServicesStatus)) {
+                                        GoogleApiAvailability.getInstance()
+                                            .getErrorDialog(activity, playServicesStatus, 1001)
+                                            ?.show()
                                     }
+                                    return@Button
+                                }
+
+                                isGoogleLoading = true
+                                googleError = null
+
+                                val webClientId = resolveGoogleWebClientId(context, viewModel.getGoogleClientId())
+                                if (webClientId.isBlank()) {
+                                    isGoogleLoading = false
+                                    googleError = "Google Sign-In setup missing. Add a valid Web Client ID."
+                                    return@Button
+                                }
+                                
+                                try {
+                                    val credentialManager = CredentialManager.create(context)
+                                    val googleIdOption = GetGoogleIdOption.Builder()
+                                        .setFilterByAuthorizedAccounts(false)
+                                        .setServerClientId(webClientId)
+                                        .setAutoSelectEnabled(false)
+                                        .build()
+
+                                    val request = GetCredentialRequest.Builder()
+                                        .addCredentialOption(googleIdOption)
+                                        .build()
+
+                                    scope.launch {
+                                        try {
+                                            android.util.Log.d("GmailLogin", "Requesting credential...")
+                                            val result = credentialManager.getCredential(context = context, request = request)
+                                            android.util.Log.d("GmailLogin", "Credential received, handling result...")
+                                            handleGoogleSignInResult(
+                                                result = result,
+                                                viewModel = viewModel,
+                                                onLoginSuccess = {
+                                                    isGoogleLoading = false
+                                                    onLoginSuccess()
+                                                },
+                                                onError = {
+                                                    isGoogleLoading = false
+                                                    googleError = it
+                                                }
+                                            )
+                                        } catch (e: NoCredentialException) {
+                                            android.util.Log.w("GmailLogin", "No credential via Credential Manager, falling back: ${e.message}")
+                                            launchLegacyGoogleAccountPicker(
+                                                context = context,
+                                                webClientId = webClientId,
+                                                launcher = googleSignInLauncher
+                                            )
+                                        } catch (e: GetCredentialException) {
+                                            android.util.Log.e("GmailLogin", "GetCredentialException: ${e.message}")
+                                            googleError = when {
+                                                e.message?.contains("no_credentials") == true ||
+                                                e.message?.contains("NoCredentialException") == true ||
+                                                e.message?.contains("No credentials available") == true ->
+                                                    null
+                                                e.message?.contains("cancelled") == true -> "Sign-in cancelled - Try again"
+                                                e.message?.contains("disabled") == true -> "Google Play Services not available"
+                                                e.message?.contains("NullPointerException") == true -> "❌ No account linked. Add Gmail in Settings → Accounts"
+                                                e.message?.contains("invalid") == true -> "Invalid request - Try again"
+                                                e.message?.contains("network") == true || e.message?.contains("IOException") == true -> "❌ Network error - Check internet"
+                                                else -> "Error: ${e.message?.take(60) ?: "Sign-in failed"}"
+                                            }
+
+                                            if (googleError == null) {
+                                                launchLegacyGoogleAccountPicker(
+                                                    context = context,
+                                                    webClientId = webClientId,
+                                                    launcher = googleSignInLauncher
+                                                )
+                                            } else {
+                                                isGoogleLoading = false
+                                            }
+                                        } catch (e: Exception) {
+                                            android.util.Log.e("GmailLogin", "General Exception: ${e.message}")
+                                            isGoogleLoading = false
+                                            googleError = "Error: ${e.localizedMessage?.take(50) ?: "Unknown error"}"
+                                        }
+                                    }
+                                } catch (e: Exception) {
+                                    isGoogleLoading = false
+                                    googleError = "Setup error: Check all permissions are granted"
                                 }
                             },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(12.dp)
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF1F2937),
+                                contentColor = Color.White
+                            ),
+                            enabled = !isGoogleLoading
                         ) {
-                            Text("Google")
+                            if (isGoogleLoading) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    color = Color.White,
+                                    strokeWidth = 2.dp
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text("Signing in...")
+                            } else {
+                                // Gmail icon (using generic icon + text)
+                                Icon(
+                                    imageVector = Icons.Default.Email,
+                                    contentDescription = "Gmail",
+                                    modifier = Modifier.size(20.dp),
+                                    tint = Color(0xFFEA4335)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text("Sign in with Gmail", fontWeight = FontWeight.SemiBold)
+                            }
                         }
+
+                        // Error message with retry and clear instructions
+                        if (googleError != null) {
+                            Spacer(Modifier.height(8.dp))
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(2.dp),
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFEBEE)),
+                                shape = RoundedCornerShape(8.dp),
+                                border = BorderStroke(1.dp, Color(0xFFEF5350))
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Text(
+                                        text = "⚠️ Sign-in Error",
+                                        color = Color(0xFFD32F2F),
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Spacer(Modifier.height(4.dp))
+                                    Text(
+                                        text = googleError!!,
+                                        color = Color(0xFFB71C1C),
+                                        fontSize = 11.sp,
+                                        lineHeight = 15.sp
+                                    )
+                                    Spacer(Modifier.height(8.dp))
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceEvenly
+                                    ) {
+                                        Text(
+                                            text = "💡 Tap button again to retry",
+                                            color = Color(0xFFC62828),
+                                            fontSize = 10.sp,
+                                            fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(Modifier.height(12.dp))
+
+                        // OTP Button
                         OutlinedButton(
                             onClick = { isOtpMode = true },
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp),
                             shape = RoundedCornerShape(12.dp)
                         ) {
-                            Icon(Icons.Default.Phone, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text("OTP")
+                            Icon(Icons.Default.Phone, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Sign in with OTP", fontWeight = FontWeight.SemiBold)
                         }
                     }
 
@@ -286,11 +489,76 @@ fun LoginScreen(
 private fun handleGoogleSignInResult(
     result: GetCredentialResponse,
     viewModel: AuthViewModel,
-    onLoginSuccess: () -> Unit
+    onLoginSuccess: () -> Unit,
+    onError: (String) -> Unit
 ) {
-    val credential = result.credential
-    if (credential is com.google.android.libraries.identity.googleid.GoogleIdTokenCredential) {
-        val idToken = credential.idToken
-        viewModel.signInWithGoogleToken(idToken, onLoginSuccess)
+    try {
+        val credential = result.credential
+
+        if (credential is CustomCredential && credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
+            val idToken = GoogleIdTokenCredential.createFrom(credential.data).idToken
+            if (idToken.isNotBlank()) {
+                viewModel.signInWithGoogleToken(idToken, onLoginSuccess)
+            } else {
+                onError("Google token not received. Try again.")
+            }
+        } else {
+            android.util.Log.w("GmailLogin", "Unexpected credential type: ${credential?.javaClass?.simpleName}")
+            onError("Unexpected Google credential response. Try again.")
+        }
+    } catch (e: Exception) {
+        android.util.Log.e("GmailLogin", "Error handling sign-in result: ${e.message}")
+        onError("Could not parse Google credential. Check setup and retry.")
     }
 }
+
+private fun launchLegacyGoogleAccountPicker(
+    context: android.content.Context,
+    webClientId: String,
+    launcher: androidx.activity.result.ActivityResultLauncher<android.content.Intent>
+) {
+    val options = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+        .requestEmail()
+        .requestIdToken(webClientId)
+        .build()
+
+    val client = GoogleSignIn.getClient(context, options)
+    client.signOut().addOnCompleteListener {
+        launcher.launch(client.signInIntent)
+    }
+}
+
+private fun resolveGoogleWebClientId(context: android.content.Context, fallback: String): String {
+    val generatedId = try {
+        val resId = context.resources.getIdentifier("default_web_client_id", "string", context.packageName)
+        if (resId != 0) context.getString(resId) else ""
+    } catch (_: Exception) {
+        ""
+    }
+
+    return when {
+        generatedId.isNotBlank() -> generatedId
+        fallback.contains("apps.googleusercontent.com") -> fallback
+        else -> ""
+    }
+}
+
+private fun isInternetAvailable(context: android.content.Context): Boolean {
+    try {
+        val connectivityManager = context.getSystemService(android.content.Context.CONNECTIVITY_SERVICE) 
+            as android.net.ConnectivityManager
+        
+        val network = connectivityManager.activeNetwork ?: return false
+        val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
+        
+        return when {
+            capabilities.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) -> true
+            capabilities.hasTransport(android.net.NetworkCapabilities.TRANSPORT_CELLULAR) -> true
+            capabilities.hasTransport(android.net.NetworkCapabilities.TRANSPORT_ETHERNET) -> true
+            else -> false
+        }
+    } catch (e: Exception) {
+        return false
+    }
+}
+
