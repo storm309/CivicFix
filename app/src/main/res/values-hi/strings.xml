@@ -27,8 +27,12 @@
     <string name="already_have_account">पहले से ही खाता है? लॉगिन करें</string>
     <string name="forgot_password">पासवर्ड भूल गए?</string>
     <string name="reset_password_title">पासवर्ड रीसेट करें</string>
-    <string name="reset_password_msg">पासवर्ड रीसेट लिंक प्राप्त करने के लिए अपना ईमेल दर्ज करें।</string>
-    <string name="send_reset_link">रीसेट लिंक भेजें</string>
+    <string name="reset_password_msg">पासवर्ड रीसेट कोड प्राप्त करने के लिए अपना ईमेल दर्ज करें।</string>
+    <string name="enter_reset_code">रीसेट कोड दर्ज करें (ईमेल से)</string>
+    <string name="enter_new_password">नया पासवर्ड दर्ज करें</string>
+    <string name="confirm_reset">पासवर्ड बदलें</string>
+    <string name="password_reset_success">पासवर्ड सफलतापूर्वक बदल गया! अब आप लॉगिन कर सकते हैं।</string>
+    <string name="send_reset_link">कोड प्राप्त करें</string>
     <string name="reset_email_sent">पासवर्ड रीसेट ईमेल भेज दिया गया है। कृपया अपना इनबॉक्स जांचें।</string>
     <string name="hide_password">पासवर्ड छुपाएं</string>
     <string name="show_password">पासवर्ड दिखाएं</string>

@@ -417,6 +417,28 @@ class AuthViewModel : ViewModel() {
             }
     }
 
+    fun confirmReset(code: String, newPass: String, onSuccess: () -> Unit) {
+        if (code.isBlank() || newPass.isBlank()) {
+            _error.value = "❌ Please enter code and new password"
+            return
+        }
+        if (newPass.length < 6) {
+            _error.value = "❌ Password must be at least 6 characters"
+            return
+        }
+        _isLoading.value = true
+        _error.value = null
+        auth.confirmPasswordReset(code, newPass)
+            .addOnCompleteListener { task ->
+                _isLoading.value = false
+                if (task.isSuccessful) {
+                    onSuccess()
+                } else {
+                    _error.value = task.exception?.message ?: "❌ Reset failed. Check the code."
+                }
+            }
+    }
+
     fun logout() {
         auth.signOut()
         _isLoggedIn.value = false

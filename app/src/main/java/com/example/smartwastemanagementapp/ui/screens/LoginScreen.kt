@@ -61,7 +61,10 @@ fun LoginScreen(
     var googleError by remember { mutableStateOf<String?>(null) }
     
     var showResetDialog by remember { mutableStateOf(false) }
+    var resetStep by remember { mutableIntStateOf(1) } // 1: Email, 2: Code+Pass
     var resetEmail by remember { mutableStateOf("") }
+    var resetCode by remember { mutableStateOf("") }
+    var newPassword by remember { mutableStateOf("") }
 
     val googleSignInLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -88,36 +91,75 @@ fun LoginScreen(
         }
     }
 
-    // Reset Password Dialog
+    // Reset Password Dialog (Enhanced 2-Step)
     if (showResetDialog) {
         AlertDialog(
             onDismissRequest = { showResetDialog = false },
             title = { Text(stringResource(R.string.reset_password_title)) },
             text = {
                 Column {
-                    Text(stringResource(R.string.reset_password_msg))
-                    Spacer(Modifier.height(16.dp))
-                    OutlinedTextField(
-                        value = resetEmail,
-                        onValueChange = { resetEmail = it },
-                        label = { Text(stringResource(R.string.email_address)) },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
-                    )
+                    if (resetStep == 1) {
+                        Text(stringResource(R.string.reset_password_msg))
+                        Spacer(Modifier.height(16.dp))
+                        OutlinedTextField(
+                            value = resetEmail,
+                            onValueChange = { resetEmail = it },
+                            label = { Text(stringResource(R.string.email_address)) },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                    } else {
+                        Text(stringResource(R.string.enter_reset_code))
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = resetCode,
+                            onValueChange = { resetCode = it },
+                            label = { Text("Reset Code") },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        Spacer(Modifier.height(16.dp))
+                        OutlinedTextField(
+                            value = newPassword,
+                            onValueChange = { newPassword = it },
+                            label = { Text(stringResource(R.string.enter_new_password)) },
+                            visualTransformation = PasswordVisualTransformation(),
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                    }
+                    
+                    viewModel.error.value?.let { err ->
+                        Text(err, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
+                    }
                 }
             },
             confirmButton = {
-                Button(
-                    onClick = {
-                        viewModel.resetPassword(resetEmail) {
-                            showResetDialog = false
-                            android.widget.Toast.makeText(context, context.getString(R.string.reset_email_sent), android.widget.Toast.LENGTH_LONG).show()
+                if (viewModel.isLoading.value) {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                } else {
+                    Button(
+                        onClick = {
+                            if (resetStep == 1) {
+                                viewModel.resetPassword(resetEmail) {
+                                    resetStep = 2
+                                }
+                            } else {
+                                viewModel.confirmReset(resetCode, newPassword) {
+                                    showResetDialog = false
+                                    resetStep = 1
+                                    android.widget.Toast.makeText(context, context.getString(R.string.password_reset_success), android.widget.Toast.LENGTH_LONG).show()
+                                }
+                            }
                         }
-                    }
-                ) { Text(stringResource(R.string.send_reset_link)) }
+                    ) { Text(if (resetStep == 1) stringResource(R.string.send_reset_link) else stringResource(R.string.confirm_reset)) }
+                }
             },
             dismissButton = {
-                TextButton(onClick = { showResetDialog = false }) { Text(stringResource(R.string.cancel)) }
+                TextButton(onClick = { 
+                    showResetDialog = false
+                    resetStep = 1
+                }) { Text(stringResource(R.string.cancel)) }
             }
         )
     }
