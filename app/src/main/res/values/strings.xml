@@ -1,6 +1,7 @@
 <resources>
     <string name="app_name">CivicFix</string>
-    <string name="app_tagline">Manage Waste Smartly</string>
+    <string name="app_logo">App Logo</string>
+    <string name="app_tagline">Smart Civic Waste Management</string>
 
     <!-- Auth Screens -->
     <string name="welcome_back">Welcome Back</string>
@@ -19,16 +20,24 @@
     <string name="gender">Gender</string>
     <string name="male">Male</string>
     <string name="female">Female</string>
+    <string name="other">Other</string>
     <string name="login_button">Login</string>
     <string name="signup_button">Sign Up</string>
     <string name="dont_have_account">Don\'t have an account? Sign Up</string>
     <string name="already_have_account">Already have an account? Login</string>
     <string name="hide_password">Hide password</string>
     <string name="show_password">Show password</string>
+    <string name="otp_mode">Phone / OTP</string>
+    <string name="email_mode">Email</string>
+    <string name="send_otp">Send OTP</string>
+    <string name="verify_otp">Verify OTP</string>
+    <string name="enter_otp">Enter 6-digit OTP</string>
+    <string name="otp_sent">OTP sent to +91 %s</string>
+    <string name="change_number">Change Number</string>
 
     <!-- Home Screen -->
     <string name="welcome_user">Welcome, %s</string>
-    <string name="user_default">User</string>
+    <string name="citizen">Citizen</string>
     <string name="user_age_gender">Age: %s | %s</string>
     <string name="age_not_available">N/A</string>
     <string name="quick_actions">Quick Actions</string>
@@ -38,42 +47,96 @@
     <string name="track_submitted_reports">Track your submitted reports</string>
     <string name="view_map">View Map</string>
     <string name="locate_waste">Locate waste nearby</string>
+    <string name="my_profile">My Profile</string>
+    <string name="manage_profile">Manage your contact info</string>
     <string name="logout">Logout</string>
-    <string name="back">Back</string>
+    <string name="logout_confirm_title">Logout?</string>
+    <string name="logout_confirm_msg">Are you sure you want to logout from CivicFix?</string>
+    <string name="cancel">Cancel</string>
+    <string name="edit_profile_desc">Keep your details up to date for better tracking</string>
+    <string name="finish_setup">Finish Setup</string>
+    <string name="save_changes">Save Changes</string>
+    <string name="civic_tips">Civic Tips 💡</string>
+    <string name="tip_report_early">Report early</string>
+    <string name="tip_report_early_desc">Issues resolved 3x faster</string>
+    <string name="tip_add_photos">Add photos</string>
+    <string name="tip_add_photos_desc">AI auto-fills description</string>
 
     <!-- Report Screen -->
-    <string name="report_waste_title">Report Waste</string>
+    <string name="report_waste_title">Report Waste Issue</string>
+    <string name="step_photo_title">Photo Evidence</string>
+    <string name="step_photo_desc">Optional – AI can analyse it</string>
+    <string name="step_desc_title">Describe the Issue</string>
+    <string name="step_desc_desc">What type of waste? How severe?</string>
+    <string name="step_loc_title">Location</string>
+    <string name="step_loc_desc">Manual address or GPS detected</string>
     <string name="whats_the_issue">What\'s the issue?</string>
-    <string name="describe_waste">Describe the waste situation here...</string>
+    <string name="describe_waste_hint">E.g. Large pile of garbage dumped near the park...</string>
     <string name="take_photo">Take Photo</string>
     <string name="retake_photo">Retake</string>
-    <string name="location_info">Location Info</string>
-    <string name="fetching_location">Fetching your current location...</string>
-    <string name="coordinates">Lat: %s, Lng: %s</string>
+    <string name="change_photo">Change</string>
+    <string name="gallery">Gallery</string>
+    <string name="camera">Camera</string>
+    <string name="analyze_ai">✨ Analyze with Gemini AI</string>
+    <string name="ai_analyzing">AI is analyzing your photo...</string>
+    <string name="ai_detecting">Detecting waste type &amp; ensuring safety</string>
+    <string name="ai_auto_filled">AI auto-filled the description!</string>
+    <string name="fetching_location">Fetching GPS location…</string>
+    <string name="location_captured">Location captured ✓</string>
+    <string name="location_unavailable">Location unavailable</string>
+    <string name="tap_map_hint">Tap map to pin location</string>
+    <string name="manual_address">Manual Address</string>
     <string name="submit_report">Submit Report</string>
+    <string name="submitting_report">Submitting your report…</string>
+    <string name="report_submitted_title">Report Submitted!</string>
+    <string name="report_submitted_msg">Your report has been sent for admin moderation.</string>
+    <string name="pending_approval_status">⏳ PENDING APPROVAL</string>
+    <string name="status_note">Note: Wait for admin approval to see your report on the map.</string>
 
     <!-- View Reports Screen -->
     <string name="waste_reports">Waste Reports</string>
-    <string name="no_reports">No reports yet. Submit your first report from Home.</string>
-    <string name="status_label">Status: %s</string>
-    <string name="location_label">Location: %s, %s</string>
+    <string name="total_reports">%s total</string>
+    <string name="filter_all">All</string>
+    <string name="filter_pending">Pending</string>
+    <string name="filter_approved">Approved</string>
+    <string name="filter_rejected">Rejected</string>
+    <string name="no_reports_yet">No reports yet</string>
+    <string name="no_filtered_reports">No %s reports</string>
+    <string name="be_first_reporter">Be the first person to report waste in your area.</string>
+    <string name="ai_safety_label">AI safety: %1$s (%2$d%%)</string>
+    <string name="review_update">Review update: %s</string>
+    <string name="not_reviewed">Not reviewed yet</string>
 
     <!-- Map Screen -->
-    <string name="waste_locations_map">Waste Locations Map</string>
-    <string name="map_disabled_notice">Map preview is currently disabled. Add a valid Google Maps API key to the manifest to enable interactive maps. Reports are listed below as a fallback.</string>
+    <string name="waste_map">Waste Map</string>
+    <string name="pinned_locations">%s approved locations pinned</string>
+    <string name="no_pins">No pins yet</string>
+    <string name="submit_to_see_map">Submit reports to see them on the map</string>
+
+    <!-- Admin Console -->
+    <string name="admin_console">Admin Console</string>
+    <string name="logged_in_as">Logged in as %s</string>
+    <string name="pending_queue">Pending Queue</string>
+    <string name="all_clear">All Clear!</string>
+    <string name="action_required">Action Required</string>
+    <string name="reports_pending_review">%s reports are pending your review</string>
+    <string name="user_view">User View</string>
+    <string name="approve">Approve</string>
+    <string name="reject">Reject</string>
+    <string name="address_label">Address: %s</string>
+    <string name="impact_points">Impact Points: %d</string>
+    <string name="support_issue">Support (%d)</string>
+    <string name="priority_level">Priority: %d</string>
+
+    <!-- Language Settings -->
+    <string name="select_language">Select Language</string>
+    <string name="english">English</string>
+    <string name="hindi">हिन्दी</string>
 
     <!-- Error Messages -->
-    <string name="please_fill_all_fields">Please fill all fields</string>
-    <string name="invalid_email">Enter a valid email address</string>
-    <string name="password_too_short">Password must be at least 6 characters</string>
-    <string name="invalid_age">Age must be between 13 and 120</string>
-    <string name="invalid_phone">Enter a valid phone number</string>
-    <string name="login_failed">Login Failed</string>
-    <string name="signup_failed">Signup Failed</string>
-    <string name="failed_to_save_user_data">Failed to save user data</string>
-    <string name="could_not_load_user_profile">Could not load user profile</string>
-    <string name="describe_issue_before_submit">Please describe the issue before submitting</string>
-
-    <!-- Splash Screen -->
-    <string name="app_logo">App Logo</string>
+    <string name="error_login_required">Please login first to submit a report</string>
+    <string name="error_no_internet">No internet connection found.</string>
+    <string name="error_gps_required">GPS Error: Please pin a location on the map</string>
+    <string name="error_ai_analyze">Please analyze the image with AI before submitting.</string>
+    <string name="ok">OK</string>
 </resources>

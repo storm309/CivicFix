@@ -1,9 +1,9 @@
 package com.example.smartwastemanagementapp
 
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
@@ -14,10 +14,12 @@ import com.example.smartwastemanagementapp.ui.screens.*
 import com.example.smartwastemanagementapp.ui.theme.SmartWasteManagementAppTheme
 import com.example.smartwastemanagementapp.viewmodel.AuthViewModel
 import com.example.smartwastemanagementapp.viewmodel.WasteViewModel
+import com.example.smartwastemanagementapp.util.LanguageManager
 
-class MainActivity : ComponentActivity() {
+class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        LanguageManager.applySavedLanguage(this)
         enableEdgeToEdge()
         setContent {
             SmartWasteManagementAppTheme {
@@ -46,19 +48,12 @@ class MainActivity : ComponentActivity() {
                         LoginScreen(
                             viewModel = authViewModel,
                             onLoginSuccess = {
-                                android.util.Log.d("MainActivity", "Login Success Callback Triggered")
-                                android.util.Log.d("MainActivity", "isLoggedIn: ${authViewModel.isLoggedIn.value}")
-                                android.util.Log.d("MainActivity", "isAdmin: ${authViewModel.isAdmin.value}")
-                                android.util.Log.d("MainActivity", "isProfileComplete: ${authViewModel.isProfileComplete.value}")
-                                
                                 if (!authViewModel.isProfileComplete.value) {
-                                    android.util.Log.d("MainActivity", "Navigating to Complete Profile")
                                     navController.navigate(Screen.CompleteProfile.route) { 
                                         popUpTo(Screen.Login.route) { inclusive = true } 
                                     }
                                 } else {
                                     val dest = if (authViewModel.isAdmin.value) Screen.AdminDashboard.route else Screen.Home.route
-                                    android.util.Log.d("MainActivity", "Navigating to: $dest")
                                     navController.navigate(dest) { 
                                         popUpTo(Screen.Login.route) { inclusive = true } 
                                     }

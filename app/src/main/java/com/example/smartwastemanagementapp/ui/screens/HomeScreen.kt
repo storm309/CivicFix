@@ -2,7 +2,7 @@ package com.example.smartwastemanagementapp.ui.screens
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -23,11 +23,17 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.smartwastemanagementapp.R
 import com.example.smartwastemanagementapp.ui.theme.*
 import com.example.smartwastemanagementapp.viewmodel.AuthViewModel
+import com.example.smartwastemanagementapp.util.LanguageManager
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import java.util.Calendar
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -43,37 +49,49 @@ fun HomeScreen(
 ) {
     val user        = authViewModel.userProfile.value
     val scrollState = rememberScrollState()
+    val context     = LocalContext.current
 
     var showLogoutDialog by remember { mutableStateOf(false) }
-
-    // Animated entrance
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { visible = true }
 
-    val greeting = remember {
+    val greeting = remember(LanguageManager.getSelectedLanguage(context)) {
         val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
-        when { hour < 12 -> "Good Morning" ; hour < 17 -> "Good Afternoon" ; else -> "Good Evening" }
+        when {
+            hour < 12 -> context.getString(R.string.welcome_back)
+            hour < 17 -> context.getString(R.string.welcome_back)
+            else -> context.getString(R.string.welcome_back)
+        }
     }
     val greetingEmoji = remember {
         val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
         when { hour < 12 -> "☀️" ; hour < 17 -> "🌤️" ; else -> "🌙" }
     }
 
-    // Logout confirmation dialog
     if (showLogoutDialog) {
         AlertDialog(
             onDismissRequest = { showLogoutDialog = false },
             icon    = { Icon(Icons.AutoMirrored.Filled.ExitToApp, null, tint = MaterialTheme.colorScheme.error) },
-            title   = { Text("Logout?", fontWeight = FontWeight.Bold) },
-            text    = { Text("Are you sure you want to logout from CivicFix?") },
+            title   = { Text(stringResource(R.string.logout_confirm_title), fontWeight = FontWeight.Bold) },
+            text    = { Text(stringResource(R.string.logout_confirm_msg)) },
             confirmButton = {
                 Button(
-                    onClick = { authViewModel.logout(); onLogout() },
+                    onClick = { 
+                        // Logout from Firebase first
+                        authViewModel.logout()
+                        
+                        // Also logout from Google to ensure the account picker shows up next time
+                        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN).build()
+                        val googleSignInClient = GoogleSignIn.getClient(context, gso)
+                        googleSignInClient.signOut().addOnCompleteListener {
+                            onLogout()
+                        }
+                    },
                     colors  = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                ) { Text("Logout") }
+                ) { Text(stringResource(R.string.logout)) }
             },
             dismissButton = {
-                OutlinedButton(onClick = { showLogoutDialog = false }) { Text("Cancel") }
+                OutlinedButton(onClick = { showLogoutDialog = false }) { Text(stringResource(R.string.cancel)) }
             }
         )
     }
@@ -83,7 +101,7 @@ fun HomeScreen(
             ExtendedFloatingActionButton(
                 onClick           = onReportWaste,
                 icon              = { Icon(Icons.Default.Add, null) },
-                text              = { Text("Report Issue", fontWeight = FontWeight.Bold) },
+                text              = { Text(stringResource(R.string.report_waste), fontWeight = FontWeight.Bold) },
                 containerColor    = MaterialTheme.colorScheme.primary,
                 contentColor      = Color.White,
                 modifier          = Modifier.shadow(8.dp, RoundedCornerShape(16.dp))
@@ -97,18 +115,30 @@ fun HomeScreen(
                 .padding(scaffoldPadding)
                 .verticalScroll(scrollState)
         ) {
-            // Stats Row on Home Screen
-            val statsReports by authViewModel.userProfile // Re-using userProfile for trigger if needed, but actually we need wasteViewModel
-            // Since we don't have wasteViewModel here directly, we can use a simpler approach or pass it.
-            // Let's assume we want a generic "Community Impact" section.
-            
-            // ── Hero Banner ──────────────────────────────────────
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(Brush.verticalGradient(listOf(EcoGreen40, EcoGreen50, Teal40)))
             ) {
-                // Decorative circles
+                // Language Toggle
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 16.dp, end = 16.dp),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    val currentLang = LanguageManager.getSelectedLanguage(context)
+                    IconButton(
+                        onClick = {
+                            val newLang = if (currentLang == "en") "hi" else "en"
+                            LanguageManager.setLanguage(context, newLang)
+                        },
+                        modifier = Modifier.background(Color.White.copy(alpha = 0.2f), CircleShape)
+                    ) {
+                        Icon(Icons.Default.Language, null, tint = Color.White)
+                    }
+                }
+
                 Box(
                     modifier = Modifier
                         .size(200.dp)
@@ -119,7 +149,6 @@ fun HomeScreen(
                 )
 
                 Column(modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 52.dp, bottom = 24.dp)) {
-                    // Top row: greeting + logout
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -132,16 +161,14 @@ fun HomeScreen(
                                 color = Color.White.copy(alpha = 0.85f)
                             )
                             Text(
-                                text  = user?.name?.ifBlank { "Citizen" } ?: "Citizen",
+                                text  = user?.name?.ifBlank { stringResource(R.string.citizen) } ?: stringResource(R.string.citizen),
                                 style = MaterialTheme.typography.headlineSmall.copy(
                                     fontWeight = FontWeight.ExtraBold
                                 ),
                                 color = Color.White
                             )
                         }
-                        // Avatar + logout
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            // Avatar circle
                             Box(
                                 modifier = Modifier
                                     .size(44.dp)
@@ -160,7 +187,7 @@ fun HomeScreen(
                             IconButton(onClick = { showLogoutDialog = true }) {
                                 Icon(
                                     Icons.AutoMirrored.Filled.ExitToApp,
-                                    contentDescription = "Logout",
+                                    contentDescription = stringResource(R.string.logout),
                                     tint = Color.White.copy(alpha = 0.9f)
                                 )
                             }
@@ -169,32 +196,52 @@ fun HomeScreen(
 
                     Spacer(Modifier.height(20.dp))
 
-                    // User info chips
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            InfoChip(icon = Icons.Default.Person, text = user?.gender ?: "N/A")
-                            InfoChip(icon = Icons.Default.DateRange, text = "Age ${user?.age ?: "N/A"}")
-                            InfoChip(icon = Icons.Default.Phone, text = user?.phoneNumber?.ifBlank { "N/A" } ?: "N/A")
+                            val genderText = when(user?.gender) {
+                                "Male" -> stringResource(R.string.male)
+                                "Female" -> stringResource(R.string.female)
+                                else -> stringResource(R.string.other)
+                            }
+                            InfoChip(icon = Icons.Default.Person, text = genderText)
+                            InfoChip(icon = Icons.Default.DateRange, text = "${stringResource(R.string.age)} ${user?.age ?: stringResource(R.string.age_not_available)}")
+                            InfoChip(icon = Icons.Default.Phone, text = user?.phoneNumber?.ifBlank { stringResource(R.string.age_not_available) } ?: stringResource(R.string.age_not_available))
+                        }
+
+                        // Display Impact Points
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.tertiaryContainer,
+                            modifier = Modifier.padding(top = 8.dp)
+                        ) {
+                            Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Stars, null, tint = MaterialTheme.colorScheme.onTertiaryContainer, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text(
+                                    stringResource(R.string.impact_points, user?.impactPoints ?: 0),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onTertiaryContainer
+                                )
+                            }
                         }
                         
-                        // Edit button moved here (Top right near info)
                         IconButton(
                             onClick = onEditProfile,
                             modifier = Modifier
                                 .size(36.dp)
                                 .background(Color.White.copy(alpha = 0.2f), CircleShape)
                         ) {
-                            Icon(Icons.Default.Edit, contentDescription = "Edit Profile", tint = Color.White, modifier = Modifier.size(16.dp))
+                            Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.manage_profile), tint = Color.White, modifier = Modifier.size(16.dp))
                         }
                     }
                 }
             }
 
-            // ── Stats strip ──────────────────────────────────────
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -202,16 +249,15 @@ fun HomeScreen(
                     .padding(top = 20.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                StatCard("Reports", "🗂️", EcoGreen40, modifier = Modifier.weight(1f), onClick = onViewReports)
-                StatCard("Pending", "⏳", MaterialTheme.colorScheme.tertiary, modifier = Modifier.weight(1f), onClick = onViewReports)
-                StatCard("Fixed", "✅", Teal40, modifier = Modifier.weight(1f), onClick = onViewReports)
+                StatCard(stringResource(R.string.filter_all), "🗂️", EcoGreen40, modifier = Modifier.weight(1f), onClick = onViewReports)
+                StatCard(stringResource(R.string.filter_pending), "⏳", MaterialTheme.colorScheme.tertiary, modifier = Modifier.weight(1f), onClick = onViewReports)
+                StatCard(stringResource(R.string.filter_approved), "✅", Teal40, modifier = Modifier.weight(1f), onClick = onViewReports)
             }
 
             Spacer(Modifier.height(24.dp))
 
-            // ── Section title ─────────────────────────────────────
             Text(
-                text     = "Quick Actions",
+                text     = stringResource(R.string.quick_actions),
                 style    = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.padding(horizontal = 20.dp),
                 color    = MaterialTheme.colorScheme.onBackground
@@ -225,8 +271,8 @@ fun HomeScreen(
                     enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { -it / 2 }
                 ) {
                     ActionCard(
-                        title = "Admin Dashboard",
-                        subtitle = "Review pending reports, approve or reject submissions",
+                        title = stringResource(R.string.admin_console),
+                        subtitle = stringResource(R.string.pending_queue),
                         icon = Icons.Default.Dashboard,
                         gradient = Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)),
                         onClick = onAdminDashboard,
@@ -236,14 +282,13 @@ fun HomeScreen(
                 Spacer(Modifier.height(14.dp))
             }
 
-            // ── Action cards (simple, no destructuring) ───────────
             AnimatedVisibility(
                 visible = visible,
                 enter   = fadeIn(tween(300)) + slideInVertically(tween(300)) { it / 2 }
             ) {
                 ActionCard(
-                    title    = "Report Waste Issue",
-                    subtitle = "Snap a photo & report waste problems near you",
+                    title    = stringResource(R.string.report_waste),
+                    subtitle = stringResource(R.string.snap_photo_report),
                     icon     = Icons.Default.Add,
                     gradient = Brush.linearGradient(listOf(EcoGreen40, EcoGreen60)),
                     onClick  = onReportWaste,
@@ -252,31 +297,14 @@ fun HomeScreen(
             }
             Spacer(Modifier.height(14.dp))
 
-            if (authViewModel.isAdmin.value) {
-                AnimatedVisibility(
-                    visible = visible,
-                    enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { -it / 2 }
-                ) {
-                    ActionCard(
-                        title = "Admin Dashboard",
-                        subtitle = "Review pending reports, approve or reject submissions",
-                        icon = Icons.Default.Dashboard,
-                        gradient = Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)),
-                        onClick = onAdminDashboard,
-                        modifier = Modifier.padding(horizontal = 20.dp)
-                    )
-                }
-                Spacer(Modifier.height(14.dp))
-            }
-
             AnimatedVisibility(
                 visible = visible,
                 enter   = fadeIn(tween(300, delayMillis = 120)) +
                           slideInVertically(tween(300, delayMillis = 120)) { it / 2 }
             ) {
                 ActionCard(
-                    title    = "View All Reports",
-                    subtitle = "Track status of submitted civic complaints",
+                    title    = stringResource(R.string.view_reports),
+                    subtitle = stringResource(R.string.track_submitted_reports),
                     icon     = Icons.AutoMirrored.Filled.List,
                     gradient = Brush.linearGradient(listOf(Teal40, Color(0xFF00BFA5))),
                     onClick  = onViewReports,
@@ -285,31 +313,14 @@ fun HomeScreen(
             }
             Spacer(Modifier.height(14.dp))
 
-            if (authViewModel.isAdmin.value) {
-                AnimatedVisibility(
-                    visible = visible,
-                    enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { -it / 2 }
-                ) {
-                    ActionCard(
-                        title = "Admin Dashboard",
-                        subtitle = "Review pending reports, approve or reject submissions",
-                        icon = Icons.Default.Dashboard,
-                        gradient = Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)),
-                        onClick = onAdminDashboard,
-                        modifier = Modifier.padding(horizontal = 20.dp)
-                    )
-                }
-                Spacer(Modifier.height(14.dp))
-            }
-
             AnimatedVisibility(
                 visible = visible,
                 enter   = fadeIn(tween(300, delayMillis = 240)) +
                           slideInVertically(tween(300, delayMillis = 240)) { it / 2 }
             ) {
                 ActionCard(
-                    title    = "Waste Map",
-                    subtitle = "See waste hotspots & reported locations on map",
+                    title    = stringResource(R.string.view_map),
+                    subtitle = stringResource(R.string.locate_waste),
                     icon     = Icons.Default.Map,
                     gradient = Brush.linearGradient(listOf(Color(0xFF1565C0), Color(0xFF42A5F5))),
                     onClick  = onViewMap,
@@ -318,31 +329,14 @@ fun HomeScreen(
             }
             Spacer(Modifier.height(14.dp))
 
-            if (authViewModel.isAdmin.value) {
-                AnimatedVisibility(
-                    visible = visible,
-                    enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { -it / 2 }
-                ) {
-                    ActionCard(
-                        title = "Admin Dashboard",
-                        subtitle = "Review pending reports, approve or reject submissions",
-                        icon = Icons.Default.Dashboard,
-                        gradient = Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)),
-                        onClick = onAdminDashboard,
-                        modifier = Modifier.padding(horizontal = 20.dp)
-                    )
-                }
-                Spacer(Modifier.height(14.dp))
-            }
-
             AnimatedVisibility(
                 visible = visible,
                 enter   = fadeIn(tween(300, delayMillis = 300))
             ) {
                 ActionCard(
-                    title    = "My Profile",
-                    subtitle = "Manage your contact info & personal details",
-                    icon     = Icons.Default.AccountCircle,
+                    title    = stringResource(R.string.my_profile),
+                    subtitle = stringResource(R.string.manage_profile),
+                    icon = Icons.Default.AccountCircle,
                     gradient = Brush.linearGradient(listOf(Color(0xFF6A1B9A), Color(0xFFAB47BC))),
                     onClick  = onEditProfile,
                     modifier = Modifier.padding(horizontal = 20.dp)
@@ -350,27 +344,9 @@ fun HomeScreen(
             }
             Spacer(Modifier.height(14.dp))
 
-            if (authViewModel.isAdmin.value) {
-                AnimatedVisibility(
-                    visible = visible,
-                    enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { -it / 2 }
-                ) {
-                    ActionCard(
-                        title = "Admin Dashboard",
-                        subtitle = "Review pending reports, approve or reject submissions",
-                        icon = Icons.Default.Dashboard,
-                        gradient = Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)),
-                        onClick = onAdminDashboard,
-                        modifier = Modifier.padding(horizontal = 20.dp)
-                    )
-                }
-                Spacer(Modifier.height(14.dp))
-            }
-
-            // ── Tips section ──────────────────────────────────────
             Spacer(Modifier.height(8.dp))
             Text(
-                text     = "Civic Tips 💡",
+                text     = stringResource(R.string.civic_tips),
                 style    = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.padding(horizontal = 20.dp)
             )
@@ -382,16 +358,14 @@ fun HomeScreen(
                     .padding(horizontal = 20.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                TipCard("Report early", "Issues resolved 3x faster", "⚡", Modifier.weight(1f))
-                TipCard("Add photos", "AI auto-fills description", "📷", Modifier.weight(1f))
+                TipCard(stringResource(R.string.tip_report_early), stringResource(R.string.tip_report_early_desc), "⚡", Modifier.weight(1f))
+                TipCard(stringResource(R.string.tip_add_photos), stringResource(R.string.tip_add_photos_desc), "📷", Modifier.weight(1f))
             }
 
-            Spacer(Modifier.height(88.dp)) // FAB clearance
+            Spacer(Modifier.height(88.dp))
         }
     }
 }
-
-// ── Reusable sub-composables ─────────────────────────────────
 
 @Composable
 private fun InfoChip(icon: ImageVector, text: String) {
@@ -450,7 +424,6 @@ private fun ActionCard(
                 .fillMaxSize()
                 .background(gradient)
         ) {
-            // Decorative circle
             Box(
                 modifier = Modifier
                     .size(90.dp)

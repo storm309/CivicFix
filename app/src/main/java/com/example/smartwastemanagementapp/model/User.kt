@@ -8,5 +8,7 @@ data class User(
     val phoneNumber: String = "",
     val gender: String = "",
     val role: String = "user",
-    val authProvider: String = "email"
+    val authProvider: String = "email",
+    val impactPoints: Int = 0,
+    val reportsSubmitted: Int = 0
 )

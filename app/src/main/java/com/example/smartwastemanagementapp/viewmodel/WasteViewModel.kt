@@ -38,6 +38,9 @@ class WasteViewModel(private val repository: WasteRepository = WasteRepository()
     private val _aiDescription = mutableStateOf<String?>(null)
     val aiDescription: State<String?> = _aiDescription
 
+    private val _aiDescriptionHi = mutableStateOf<String?>(null)
+    val aiDescriptionHi: State<String?> = _aiDescriptionHi
+
     private val _imageModeration = mutableStateOf<ImageModerationResult?>(null)
     val imageModeration: State<ImageModerationResult?> = _imageModeration
 
@@ -80,60 +83,52 @@ class WasteViewModel(private val repository: WasteRepository = WasteRepository()
     }
 
     fun submitReport(
-        context: android.content.Context, // Added for Geocoding
+        context: android.content.Context,
         description: String,
-        address: String,            // Added explicit address parameter
-        imageUri: Uri?,             // optional photo
+        descriptionHi: String = "",
+        address: String,
+        imageUri: Uri?,
         latitude: Double,
         longitude: Double,
         locationAccuracyMeters: Float,
-        // locationCapturedAt: Long, // This is no longer needed
         onSuccess: () -> Unit
     ) {
         val currentUser = FirebaseAuth.getInstance().currentUser
 
-        // CRITICAL: Must be authenticated to submit
         if (currentUser == null) {
-            _error.value = "❌ Authentication Error: You must be logged in to submit a report. Please login and try again."
-            android.util.Log.e("WasteViewModel", "Submission failed: User not authenticated (currentUser is null)")
+            _error.value = "❌ Authentication Error: You must be logged in to submit a report."
             return
         }
 
         val userId = currentUser.uid
-        android.util.Log.d("WasteViewModel", "Submitting report for authenticated user: $userId (${currentUser.email})")
 
         viewModelScope.launch(exceptionHandler) {
             try {
                 val moderation = _imageModeration.value
                 if (imageUri != null && moderation == null) {
-                    _error.value = "Please analyze image before submitting so unsafe uploads can be blocked"
+                    _error.value = "Please analyze image before submitting"
                     return@launch
                 }
                 if (imageUri != null && moderation != null && moderation.score < 0.60) {
-                    _error.value = "Image blocked by AI moderation. Upload a clear waste-related photo."
+                    _error.value = "Image blocked by AI moderation."
                     return@launch
                 }
 
                 _isLoading.value = true
                 _error.value = null
 
-                // Convert Uri to Bytes safely
                 val imageBytes = imageUri?.let { uri ->
-                    try {
-                        context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-                    } catch (e: Exception) {
-                        android.util.Log.e("WasteViewModel", "Failed to read image bytes: ${e.message}")
-                        null
-                    }
+                    context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
                 }
 
                 val result = repository.submitReport(
                     description = description,
+                    descriptionHi = descriptionHi,
                     imageBytes = imageBytes,
                     latitude = latitude,
                     longitude = longitude,
                     locationAccuracyMeters = locationAccuracyMeters,
-                    locationCapturedAt = System.currentTimeMillis(), // Always use current time
+                    locationCapturedAt = System.currentTimeMillis(),
                     userId = userId,
                     aiSafetyScore = moderation?.score ?: 0.0,
                     aiSafetyLabel = moderation?.label ?: "unchecked",
@@ -144,6 +139,7 @@ class WasteViewModel(private val repository: WasteRepository = WasteRepository()
                     fetchReports()
                     fetchPendingReports()
                     _imageModeration.value = null
+                    _aiDescriptionHi.value = null
                 } else {
                     _error.value = result.exceptionOrNull()?.localizedMessage ?: "Submit failed"
                 }
@@ -189,7 +185,11 @@ class WasteViewModel(private val repository: WasteRepository = WasteRepository()
                                         "Look at this image and write a clear, concise 1-2 sentence " +
                                         "description of the waste issue for a complaint report. " +
                                         "Mention the type of waste and the severity. " +
-                                        "Then in next line output this format exactly: SAFETY:<score_0_to_1>|<safe_or_unsafe>|<reason>. " +
+                                        "Provide the description in BOTH English and Hindi. " +
+                                        "Respond strictly in this format:\n" +
+                                        "EN: <english_description>\n" +
+                                        "HI: <hindi_description>\n" +
+                                        "SAFETY:<score_0_to_1>|<safe_or_unsafe>|<reason>\n" +
                                         "Mark unsafe if image is unrelated, explicit, abusive, or not waste evidence."
                                 )
                             }
@@ -203,10 +203,16 @@ class WasteViewModel(private val repository: WasteRepository = WasteRepository()
                 }
 
                 if (raw.isBlank()) {
-                    throw lastException ?: IllegalStateException("All AI models failed or returned empty response")
+                    throw lastException ?: IllegalStateException("All AI models failed")
                 }
 
-                _aiDescription.value = raw.lineSequence().firstOrNull()?.trim().orEmpty()
+                val enDesc = raw.lineSequence()
+                    .firstOrNull { it.startsWith("EN:", ignoreCase = true) }?.substringAfter(":")?.trim()
+                val hiDesc = raw.lineSequence()
+                    .firstOrNull { it.startsWith("HI:", ignoreCase = true) }?.substringAfter(":")?.trim()
+
+                _aiDescription.value = enDesc ?: raw.lineSequence().firstOrNull()?.trim()
+                _aiDescriptionHi.value = hiDesc ?: _aiDescription.value
                 _imageModeration.value = parseSafetyLine(raw)
             } catch (e: Exception) {
                 _error.value = mapAiError(e)
@@ -230,6 +236,14 @@ class WasteViewModel(private val repository: WasteRepository = WasteRepository()
             msg.contains("network", ignoreCase = true) || msg.contains("timeout", ignoreCase = true) ->
                 "Network issue. Check WiFi/Data and retry."
             else -> "AI error: ${msg.take(80)}. Check API setup or billing status."
+        }
+    }
+
+    fun upvoteReport(reportId: String) {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        viewModelScope.launch(exceptionHandler) {
+            repository.upvoteReport(reportId, userId)
+            fetchReports()
         }
     }
 
@@ -269,6 +283,7 @@ class WasteViewModel(private val repository: WasteRepository = WasteRepository()
 
     fun clearAiDescription() {
         _aiDescription.value = null
+        _aiDescriptionHi.value = null
     }
 
     private fun parseSafetyLine(raw: String): ImageModerationResult {

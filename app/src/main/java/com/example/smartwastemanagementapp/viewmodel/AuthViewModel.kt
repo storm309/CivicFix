@@ -61,8 +61,6 @@ class AuthViewModel : ViewModel() {
         try {
             auth.signInWithEmailAndPassword(email, pass)
                 .addOnCompleteListener { task ->
-                    _isLoading.value = false
-
                     if (task.isSuccessful) {
                         val firebaseUser = task.result.user
                         val uid = firebaseUser?.uid.orEmpty()
@@ -74,11 +72,14 @@ class AuthViewModel : ViewModel() {
                             role = provisionalRole.dbValue,
                             authProvider = "email"
                         )
-                        fetchUserProfile(uid)
-                        _isLoggedIn.value = true
-                        syncRoleFlags()
-                        onSuccess()
+                        fetchUserProfile(uid) {
+                            _isLoading.value = false
+                            _isLoggedIn.value = true
+                            syncRoleFlags()
+                            onSuccess()
+                        }
                     } else {
+                        _isLoading.value = false
                         val errorMsg = when {
                             task.exception?.message?.contains("PERMISSION_DENIED") == true ->
                                 "❌ Permission denied - Check app permissions"
@@ -142,13 +143,15 @@ class AuthViewModel : ViewModel() {
                     )
                     database.child(uid).setValue(newUser)
                         .addOnCompleteListener { dbTask ->
-                            _isLoading.value = false
                             if (dbTask.isSuccessful) {
                                 _userProfile.value = newUser
+                                _isProfileComplete.value = newUser.name.isNotBlank() && newUser.age.isNotBlank()
                                 _isLoggedIn.value = true
                                 syncRoleFlags()
+                                _isLoading.value = false
                                 onSuccess()
                             } else {
+                                _isLoading.value = false
                                 _error.value = "Failed to save user data: ${dbTask.exception?.message}"
                             }
                         }
@@ -159,7 +162,7 @@ class AuthViewModel : ViewModel() {
             }
     }
 
-    private fun fetchUserProfile(uid: String) {
+    private fun fetchUserProfile(uid: String, onDone: () -> Unit = {}) {
         database.child(uid).get()
             .addOnSuccessListener { snapshot ->
                 val dbUser = snapshot.getValue(User::class.java)
@@ -176,9 +179,11 @@ class AuthViewModel : ViewModel() {
                     }
                 }
                 syncRoleFlags()
+                onDone()
             }
             .addOnFailureListener {
                 _isProfileComplete.value = false
+                onDone()
             }
     }
 
@@ -270,9 +275,10 @@ class AuthViewModel : ViewModel() {
             .addOnCompleteListener { task ->
                 if (task.isSuccessful) {
                     val uid = task.result.user?.uid ?: ""
-                    fetchUserProfile(uid)
-                    _isLoggedIn.value = true
-                    _isLoading.value = false
+                    fetchUserProfile(uid) {
+                        _isLoggedIn.value = true
+                        _isLoading.value = false
+                    }
                 } else {
                     _isLoading.value = false
                     _error.value = task.exception?.message
@@ -331,12 +337,14 @@ class AuthViewModel : ViewModel() {
                                 database.child(uid).setValue(mergedUser)
                                     .addOnSuccessListener {
                                         _userProfile.value = mergedUser
-                                        _isLoggedIn.value = true
                                         _isProfileComplete.value = mergedUser.name.isNotBlank() && mergedUser.age.isNotBlank()
                                         syncRoleFlags()
+                                        _isLoading.value = false
+                                        _isLoggedIn.value = true
                                         onSuccess()
                                     }
                                     .addOnFailureListener { dbError ->
+                                        _isLoading.value = false
                                         _error.value = "❌ Database error: ${dbError.localizedMessage ?: "Failed to save profile"}"
                                         _isLoggedIn.value = false
                                     }
@@ -396,6 +404,8 @@ class AuthViewModel : ViewModel() {
         _isLoggedIn.value = false
         _userProfile.value = null
         _isAdmin.value = false
+        _isProfileComplete.value = false
+        _error.value = null
     }
 
     private fun isAdminEmail(email: String?): Boolean {

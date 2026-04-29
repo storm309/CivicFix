@@ -20,6 +20,7 @@ class WasteRepository {
 
     suspend fun submitReport(
         description: String,
+        descriptionHi: String = "",
         imageBytes: ByteArray?,
         latitude: Double,
         longitude: Double,
@@ -60,6 +61,7 @@ class WasteRepository {
         val report = WasteReport(
             id = reportId,
             description = description,
+            descriptionHi = descriptionHi,
             imageUrl = imageUrl,
             latitude = latitude,
             longitude = longitude,
@@ -120,13 +122,44 @@ class WasteRepository {
         }
     }
 
+    suspend fun upvoteReport(reportId: String, userId: String): Result<Unit> = try {
+        val upvoteRef = reportsRef.child(reportId).child("upvotes").child(userId)
+        val snapshot = upvoteRef.get().await()
+        
+        if (snapshot.exists()) {
+            // Already upvoted, so remove it (Toggle)
+            upvoteRef.removeValue().await()
+        } else {
+            // Add upvote
+            upvoteRef.setValue(true).await()
+        }
+        
+        // Recalculate priority (Simple version: priority = upvote count)
+        val updatedReportSnapshot = reportsRef.child(reportId).get().await()
+        val upvotesCount = updatedReportSnapshot.child("upvotes").childrenCount.toInt()
+        reportsRef.child(reportId).child("priority").setValue(upvotesCount).await()
+        
+        Result.success(Unit)
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
+
+    suspend fun rewardUser(userId: String, points: Int): Result<Unit> = try {
+        val userPointsRef = firebaseDb.getReference("users").child(userId).child("impactPoints")
+        val currentPoints = userPointsRef.get().await().getValue(Int::class.java) ?: 0
+        userPointsRef.setValue(currentPoints + points).await()
+        Result.success(Unit)
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
+
     suspend fun updateModerationStatus(
         reportId: String,
         status: ReportModerationStatus,
         moderatedBy: String,
         note: String
     ): Result<Unit> = try {
-        val updates = mapOf(
+        val updates = mutableMapOf<String, Any>(
             "moderationStatus" to status.dbValue,
             "moderationUpdatedAt" to System.currentTimeMillis(),
             "moderationNote" to note,
@@ -134,6 +167,15 @@ class WasteRepository {
             "status" to if (status == ReportModerationStatus.APPROVED) "Pending" else "Rejected"
         )
         reportsRef.child(reportId).updateChildren(updates).await()
+        
+        // REWARD LOGIC: If approved, give points to the original reporter
+        if (status == ReportModerationStatus.APPROVED) {
+            val reporterId = reportsRef.child(reportId).child("reportedBy").get().await().getValue(String::class.java)
+            if (reporterId != null) {
+                rewardUser(reporterId, 50) // Give 50 points for approved report
+            }
+        }
+
         Result.success(Unit)
     } catch (e: Exception) {
         Result.failure(e)

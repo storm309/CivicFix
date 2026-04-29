@@ -3,6 +3,7 @@ package com.example.smartwastemanagementapp.model
 data class WasteReport(
     val id: String = "",
     val description: String = "",
+    val descriptionHi: String = "",
     val imageUrl: String = "",
     val latitude: Double = 0.0,
     val longitude: Double = 0.0,
@@ -17,5 +18,7 @@ data class WasteReport(
     val aiSafetyLabel: String = "unchecked",
     val locationAddress: String = "", // Added for human-readable location
     val timestamp: Long = System.currentTimeMillis(),
-    val reportedBy: String = ""
+    val reportedBy: String = "",
+    val upvotes: Map<String, Boolean> = emptyMap(), // Map of UID -> true
+    val priority: Int = 0 // Derived from upvote count
 )
