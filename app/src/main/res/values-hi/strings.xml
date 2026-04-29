@@ -25,6 +25,11 @@
     <string name="signup_button">साइन अप</string>
     <string name="dont_have_account">खाता नहीं है? साइन अप करें</string>
     <string name="already_have_account">पहले से ही खाता है? लॉगिन करें</string>
+    <string name="forgot_password">पासवर्ड भूल गए?</string>
+    <string name="reset_password_title">पासवर्ड रीसेट करें</string>
+    <string name="reset_password_msg">पासवर्ड रीसेट लिंक प्राप्त करने के लिए अपना ईमेल दर्ज करें।</string>
+    <string name="send_reset_link">रीसेट लिंक भेजें</string>
+    <string name="reset_email_sent">पासवर्ड रीसेट ईमेल भेज दिया गया है। कृपया अपना इनबॉक्स जांचें।</string>
     <string name="hide_password">पासवर्ड छुपाएं</string>
     <string name="show_password">पासवर्ड दिखाएं</string>
     <string name="otp_mode">फ़ोन / ओटीपी</string>

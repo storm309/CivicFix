@@ -399,6 +399,24 @@ class AuthViewModel : ViewModel() {
         return BuildConfig.GOOGLE_WEB_CLIENT_ID
     }
 
+    fun resetPassword(email: String, onSuccess: () -> Unit) {
+        if (email.isBlank()) {
+            _error.value = "❌ Please enter your email address"
+            return
+        }
+        _isLoading.value = true
+        _error.value = null
+        auth.sendPasswordResetEmail(email)
+            .addOnCompleteListener { task ->
+                _isLoading.value = false
+                if (task.isSuccessful) {
+                    onSuccess()
+                } else {
+                    _error.value = task.exception?.message ?: "❌ Failed to send reset email"
+                }
+            }
+    }
+
     fun logout() {
         auth.signOut()
         _isLoggedIn.value = false

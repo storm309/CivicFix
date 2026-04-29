@@ -59,6 +59,9 @@ fun LoginScreen(
     val scrollState     = rememberScrollState()
     var isGoogleLoading by remember { mutableStateOf(false) }
     var googleError by remember { mutableStateOf<String?>(null) }
+    
+    var showResetDialog by remember { mutableStateOf(false) }
+    var resetEmail by remember { mutableStateOf("") }
 
     val googleSignInLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -83,6 +86,40 @@ fun LoginScreen(
             isGoogleLoading = false
             googleError = "Google Sign-In failed"
         }
+    }
+
+    // Reset Password Dialog
+    if (showResetDialog) {
+        AlertDialog(
+            onDismissRequest = { showResetDialog = false },
+            title = { Text(stringResource(R.string.reset_password_title)) },
+            text = {
+                Column {
+                    Text(stringResource(R.string.reset_password_msg))
+                    Spacer(Modifier.height(16.dp))
+                    OutlinedTextField(
+                        value = resetEmail,
+                        onValueChange = { resetEmail = it },
+                        label = { Text(stringResource(R.string.email_address)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.resetPassword(resetEmail) {
+                            showResetDialog = false
+                            android.widget.Toast.makeText(context, context.getString(R.string.reset_email_sent), android.widget.Toast.LENGTH_LONG).show()
+                        }
+                    }
+                ) { Text(stringResource(R.string.send_reset_link)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResetDialog = false }) { Text(stringResource(R.string.cancel)) }
+            }
+        )
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -199,6 +236,16 @@ fun LoginScreen(
                                     modifier = Modifier.fillMaxWidth(),
                                     shape = RoundedCornerShape(14.dp)
                                 )
+                                
+                                TextButton(
+                                    onClick = { 
+                                        resetEmail = email
+                                        showResetDialog = true 
+                                    },
+                                    modifier = Modifier.align(Alignment.End)
+                                ) {
+                                    Text(stringResource(R.string.forgot_password), style = MaterialTheme.typography.bodySmall)
+                                }
                             }
                         } else {
                             Column {
