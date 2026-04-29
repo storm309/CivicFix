@@ -2,6 +2,7 @@ package com.example.smartwastemanagementapp.ui.screens
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -35,7 +36,9 @@ fun HomeScreen(
     onReportWaste: () -> Unit,
     onViewReports: () -> Unit,
     onViewMap:     () -> Unit,
+    onEditProfile: () -> Unit,
     onLogout:      () -> Unit,
+    onAdminDashboard: () -> Unit = {},
     authViewModel: AuthViewModel
 ) {
     val user        = authViewModel.userProfile.value
@@ -94,6 +97,11 @@ fun HomeScreen(
                 .padding(scaffoldPadding)
                 .verticalScroll(scrollState)
         ) {
+            // Stats Row on Home Screen
+            val statsReports by authViewModel.userProfile // Re-using userProfile for trigger if needed, but actually we need wasteViewModel
+            // Since we don't have wasteViewModel here directly, we can use a simpler approach or pass it.
+            // Let's assume we want a generic "Community Impact" section.
+            
             // ── Hero Banner ──────────────────────────────────────
             Box(
                 modifier = Modifier
@@ -162,10 +170,26 @@ fun HomeScreen(
                     Spacer(Modifier.height(20.dp))
 
                     // User info chips
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        InfoChip(icon = Icons.Default.Person, text = user?.gender ?: "N/A")
-                        InfoChip(icon = Icons.Default.DateRange, text = "Age ${user?.age ?: "N/A"}")
-                        InfoChip(icon = Icons.Default.Phone, text = user?.phoneNumber?.ifBlank { "N/A" } ?: "N/A")
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            InfoChip(icon = Icons.Default.Person, text = user?.gender ?: "N/A")
+                            InfoChip(icon = Icons.Default.DateRange, text = "Age ${user?.age ?: "N/A"}")
+                            InfoChip(icon = Icons.Default.Phone, text = user?.phoneNumber?.ifBlank { "N/A" } ?: "N/A")
+                        }
+                        
+                        // Edit button moved here (Top right near info)
+                        IconButton(
+                            onClick = onEditProfile,
+                            modifier = Modifier
+                                .size(36.dp)
+                                .background(Color.White.copy(alpha = 0.2f), CircleShape)
+                        ) {
+                            Icon(Icons.Default.Edit, contentDescription = "Edit Profile", tint = Color.White, modifier = Modifier.size(16.dp))
+                        }
                     }
                 }
             }
@@ -195,6 +219,23 @@ fun HomeScreen(
 
             Spacer(Modifier.height(14.dp))
 
+            if (authViewModel.isAdmin.value) {
+                AnimatedVisibility(
+                    visible = visible,
+                    enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { -it / 2 }
+                ) {
+                    ActionCard(
+                        title = "Admin Dashboard",
+                        subtitle = "Review pending reports, approve or reject submissions",
+                        icon = Icons.Default.Dashboard,
+                        gradient = Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)),
+                        onClick = onAdminDashboard,
+                        modifier = Modifier.padding(horizontal = 20.dp)
+                    )
+                }
+                Spacer(Modifier.height(14.dp))
+            }
+
             // ── Action cards (simple, no destructuring) ───────────
             AnimatedVisibility(
                 visible = visible,
@@ -210,6 +251,23 @@ fun HomeScreen(
                 )
             }
             Spacer(Modifier.height(14.dp))
+
+            if (authViewModel.isAdmin.value) {
+                AnimatedVisibility(
+                    visible = visible,
+                    enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { -it / 2 }
+                ) {
+                    ActionCard(
+                        title = "Admin Dashboard",
+                        subtitle = "Review pending reports, approve or reject submissions",
+                        icon = Icons.Default.Dashboard,
+                        gradient = Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)),
+                        onClick = onAdminDashboard,
+                        modifier = Modifier.padding(horizontal = 20.dp)
+                    )
+                }
+                Spacer(Modifier.height(14.dp))
+            }
 
             AnimatedVisibility(
                 visible = visible,
@@ -227,6 +285,23 @@ fun HomeScreen(
             }
             Spacer(Modifier.height(14.dp))
 
+            if (authViewModel.isAdmin.value) {
+                AnimatedVisibility(
+                    visible = visible,
+                    enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { -it / 2 }
+                ) {
+                    ActionCard(
+                        title = "Admin Dashboard",
+                        subtitle = "Review pending reports, approve or reject submissions",
+                        icon = Icons.Default.Dashboard,
+                        gradient = Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)),
+                        onClick = onAdminDashboard,
+                        modifier = Modifier.padding(horizontal = 20.dp)
+                    )
+                }
+                Spacer(Modifier.height(14.dp))
+            }
+
             AnimatedVisibility(
                 visible = visible,
                 enter   = fadeIn(tween(300, delayMillis = 240)) +
@@ -242,6 +317,55 @@ fun HomeScreen(
                 )
             }
             Spacer(Modifier.height(14.dp))
+
+            if (authViewModel.isAdmin.value) {
+                AnimatedVisibility(
+                    visible = visible,
+                    enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { -it / 2 }
+                ) {
+                    ActionCard(
+                        title = "Admin Dashboard",
+                        subtitle = "Review pending reports, approve or reject submissions",
+                        icon = Icons.Default.Dashboard,
+                        gradient = Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)),
+                        onClick = onAdminDashboard,
+                        modifier = Modifier.padding(horizontal = 20.dp)
+                    )
+                }
+                Spacer(Modifier.height(14.dp))
+            }
+
+            AnimatedVisibility(
+                visible = visible,
+                enter   = fadeIn(tween(300, delayMillis = 300))
+            ) {
+                ActionCard(
+                    title    = "My Profile",
+                    subtitle = "Manage your contact info & personal details",
+                    icon     = Icons.Default.AccountCircle,
+                    gradient = Brush.linearGradient(listOf(Color(0xFF6A1B9A), Color(0xFFAB47BC))),
+                    onClick  = onEditProfile,
+                    modifier = Modifier.padding(horizontal = 20.dp)
+                )
+            }
+            Spacer(Modifier.height(14.dp))
+
+            if (authViewModel.isAdmin.value) {
+                AnimatedVisibility(
+                    visible = visible,
+                    enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { -it / 2 }
+                ) {
+                    ActionCard(
+                        title = "Admin Dashboard",
+                        subtitle = "Review pending reports, approve or reject submissions",
+                        icon = Icons.Default.Dashboard,
+                        gradient = Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)),
+                        onClick = onAdminDashboard,
+                        modifier = Modifier.padding(horizontal = 20.dp)
+                    )
+                }
+                Spacer(Modifier.height(14.dp))
+            }
 
             // ── Tips section ──────────────────────────────────────
             Spacer(Modifier.height(8.dp))

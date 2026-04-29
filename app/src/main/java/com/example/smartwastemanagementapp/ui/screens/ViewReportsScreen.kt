@@ -451,7 +451,7 @@ private fun ReportCard(report: WasteReport, index: Int = 0) {
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
                             Icon(
                                 Icons.Default.LocationOn,
                                 contentDescription = null,
@@ -460,9 +460,11 @@ private fun ReportCard(report: WasteReport, index: Int = 0) {
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = "${"%.4f".format(report.latitude)}, ${"%.4f".format(report.longitude)}",
+                                text = report.locationAddress.ifBlank { "${"%.4f".format(report.latitude)}, ${"%.4f".format(report.longitude)}" },
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
 

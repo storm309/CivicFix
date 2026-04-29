@@ -24,11 +24,24 @@ import kotlin.math.roundToInt
 @Composable
 fun CompleteProfileScreen(
     viewModel: AuthViewModel,
+    isEditMode: Boolean = false,
     onComplete: () -> Unit
 ) {
+    val profile = viewModel.userProfile.value
+
     var name     by remember { mutableStateOf("") }
     var ageValue by remember { mutableFloatStateOf(25f) }
     var gender   by remember { mutableStateOf("Male") }
+    var phone    by remember { mutableStateOf("") }
+
+    LaunchedEffect(profile?.uid) {
+        if (profile != null) {
+            name = profile.name
+            ageValue = profile.age.toFloatOrNull()?.coerceIn(10f, 90f) ?: ageValue
+            gender = profile.gender.ifBlank { gender }
+            phone = profile.phoneNumber.ifBlank { "" }
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -49,11 +62,12 @@ fun CompleteProfileScreen(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    "Welcome to CivicFix!",
+                    if (isEditMode) "Edit Your Profile" else "Welcome to CivicFix!",
                     style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.ExtraBold)
                 )
                 Text(
-                    "Tell us a bit about yourself to get started",
+                    if (isEditMode) "Keep your details up to date for better report tracking"
+                    else "Tell us a bit about yourself to get started",
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(top = 4.dp, bottom = 24.dp)
                 )
@@ -65,6 +79,18 @@ fun CompleteProfileScreen(
                     leadingIcon = { Icon(Icons.Default.Person, null) },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp)
+                )
+
+                Spacer(Modifier.height(16.dp))
+
+                OutlinedTextField(
+                    value = phone,
+                    onValueChange = { phone = it },
+                    label = { Text("Phone Number") },
+                    leadingIcon = { Icon(Icons.Default.Person, null) },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Phone)
                 )
 
                 Spacer(Modifier.height(20.dp))
@@ -100,12 +126,12 @@ fun CompleteProfileScreen(
                     CircularProgressIndicator()
                 } else {
                     Button(
-                        onClick = { viewModel.updateProfile(name, ageValue.roundToInt().toString(), gender, onComplete) },
+                        onClick = { viewModel.updateProfile(name, ageValue.roundToInt().toString(), gender, phone, onComplete) },
                         modifier = Modifier.fillMaxWidth().height(56.dp),
                         shape = RoundedCornerShape(16.dp),
                         enabled = name.isNotBlank()
                     ) {
-                        Text("Finish Setup", fontWeight = FontWeight.Bold)
+                        Text(if (isEditMode) "Save Changes" else "Finish Setup", fontWeight = FontWeight.Bold)
                     }
                 }
             }

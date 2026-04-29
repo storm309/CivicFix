@@ -80,13 +80,28 @@ class WasteViewModel(private val repository: WasteRepository = WasteRepository()
     }
 
     fun submitReport(
+        context: android.content.Context, // Added for Geocoding
         description: String,
+        address: String,            // Added explicit address parameter
         imageUri: Uri?,             // optional photo
         latitude: Double,
         longitude: Double,
+        locationAccuracyMeters: Float,
+        // locationCapturedAt: Long, // This is no longer needed
         onSuccess: () -> Unit
     ) {
-        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: "anonymous"
+        val currentUser = FirebaseAuth.getInstance().currentUser
+
+        // CRITICAL: Must be authenticated to submit
+        if (currentUser == null) {
+            _error.value = "❌ Authentication Error: You must be logged in to submit a report. Please login and try again."
+            android.util.Log.e("WasteViewModel", "Submission failed: User not authenticated (currentUser is null)")
+            return
+        }
+
+        val userId = currentUser.uid
+        android.util.Log.d("WasteViewModel", "Submitting report for authenticated user: $userId (${currentUser.email})")
+
         viewModelScope.launch(exceptionHandler) {
             try {
                 val moderation = _imageModeration.value
@@ -98,16 +113,31 @@ class WasteViewModel(private val repository: WasteRepository = WasteRepository()
                     _error.value = "Image blocked by AI moderation. Upload a clear waste-related photo."
                     return@launch
                 }
+
                 _isLoading.value = true
                 _error.value = null
+
+                // Convert Uri to Bytes safely
+                val imageBytes = imageUri?.let { uri ->
+                    try {
+                        context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                    } catch (e: Exception) {
+                        android.util.Log.e("WasteViewModel", "Failed to read image bytes: ${e.message}")
+                        null
+                    }
+                }
+
                 val result = repository.submitReport(
                     description = description,
-                    imageUri = imageUri,
+                    imageBytes = imageBytes,
                     latitude = latitude,
                     longitude = longitude,
+                    locationAccuracyMeters = locationAccuracyMeters,
+                    locationCapturedAt = System.currentTimeMillis(), // Always use current time
                     userId = userId,
                     aiSafetyScore = moderation?.score ?: 0.0,
-                    aiSafetyLabel = moderation?.label ?: "unchecked"
+                    aiSafetyLabel = moderation?.label ?: "unchecked",
+                    locationAddress = address
                 )
                 if (result.isSuccess) {
                     onSuccess()
@@ -125,7 +155,7 @@ class WasteViewModel(private val repository: WasteRepository = WasteRepository()
         }
     }
 
-    /** Analyse a waste photo with Gemini 2.0 Flash and fill aiDescription */
+    /** Analyse a waste photo with configured Gemini model and fill aiDescription */
     fun analyzeWasteImage(bitmap: Bitmap) {
         viewModelScope.launch(exceptionHandler) {
             try {
@@ -133,31 +163,73 @@ class WasteViewModel(private val repository: WasteRepository = WasteRepository()
                 _aiDescription.value = null
                 _imageModeration.value = null
                 _error.value = null
-                val model = GenerativeModel(
-                    modelName = "gemini-2.0-flash",
-                    apiKey = BuildConfig.GEMINI_API_KEY
-                )
-                val response = model.generateContent(
-                    content {
-                        image(bitmap)
-                        text(
-                            "You are a civic waste management assistant. " +
-                            "Look at this image and write a clear, concise 1-2 sentence " +
-                            "description of the waste issue for a complaint report. " +
-                            "Mention the type of waste and the severity. " +
-                            "Then in next line output this format exactly: SAFETY:<score_0_to_1>|<safe_or_unsafe>|<reason>. " +
-                            "Mark unsafe if image is unrelated, explicit, abusive, or not waste evidence."
+
+                if (BuildConfig.GEMINI_API_KEY.isBlank()) {
+                    _error.value = "Gemini API key is missing. Add GEMINI_API_KEY in local.properties"
+                    return@launch
+                }
+
+                // Primary model based on your API key's availability
+                val modelsToTry = listOf("gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash")
+                var raw = ""
+                var lastException: Exception? = null
+
+                for (modelName in modelsToTry) {
+                    try {
+                        android.util.Log.d("WasteViewModel", "Attempting AI analysis with $modelName")
+                        val model = GenerativeModel(
+                            modelName = modelName,
+                            apiKey = BuildConfig.GEMINI_API_KEY
                         )
+                        val response = model.generateContent(
+                            content {
+                                image(bitmap)
+                                text(
+                                    "You are a civic waste management assistant. " +
+                                        "Look at this image and write a clear, concise 1-2 sentence " +
+                                        "description of the waste issue for a complaint report. " +
+                                        "Mention the type of waste and the severity. " +
+                                        "Then in next line output this format exactly: SAFETY:<score_0_to_1>|<safe_or_unsafe>|<reason>. " +
+                                        "Mark unsafe if image is unrelated, explicit, abusive, or not waste evidence."
+                                )
+                            }
+                        )
+                        raw = response.text?.trim().orEmpty()
+                        if (raw.isNotBlank()) break // Success!
+                    } catch (e: Exception) {
+                        android.util.Log.w("WasteViewModel", "Model $modelName failed: ${e.message}")
+                        lastException = e
                     }
-                )
-                val raw = response.text?.trim().orEmpty()
+                }
+
+                if (raw.isBlank()) {
+                    throw lastException ?: IllegalStateException("All AI models failed or returned empty response")
+                }
+
                 _aiDescription.value = raw.lineSequence().firstOrNull()?.trim().orEmpty()
                 _imageModeration.value = parseSafetyLine(raw)
             } catch (e: Exception) {
-                _error.value = "AI analysis failed: ${e.localizedMessage}"
+                _error.value = mapAiError(e)
             } finally {
                 _isAnalyzing.value = false
             }
+        }
+    }
+
+    private fun mapAiError(error: Throwable): String {
+        val msg = error.localizedMessage.orEmpty()
+        android.util.Log.e("WasteViewModel", "AI Error Detail: $msg")
+        
+        return when {
+            msg.contains("PERMISSION_DENIED", ignoreCase = true) || msg.contains("403") ->
+                "AI access denied (403). Check API key billing and 'Generative Language API' in Google Cloud Console."
+            msg.contains("quota", ignoreCase = true) || msg.contains("429") ->
+                "AI quota exceeded. Paid keys still have limits. Please retry in a minute."
+            msg.contains("API key", ignoreCase = true) || msg.contains("invalid", ignoreCase = true) ->
+                "Invalid Gemini API key. Please check your key in AI Studio."
+            msg.contains("network", ignoreCase = true) || msg.contains("timeout", ignoreCase = true) ->
+                "Network issue. Check WiFi/Data and retry."
+            else -> "AI error: ${msg.take(80)}. Check API setup or billing status."
         }
     }
 

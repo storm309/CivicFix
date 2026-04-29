@@ -404,15 +404,14 @@ fun LoginScreen(
                                 Spacer(Modifier.width(8.dp))
                                 Text("Signing in...")
                             } else {
-                                // Gmail icon (using generic icon + text)
-                                Icon(
-                                    imageVector = Icons.Default.Email,
+                                // Real Gmail icon from resources
+                                Image(
+                                    painter = painterResource(id = R.drawable.ic_gmail),
                                     contentDescription = "Gmail",
-                                    modifier = Modifier.size(20.dp),
-                                    tint = Color(0xFFEA4335)
+                                    modifier = Modifier.size(20.dp)
                                 )
-                                Spacer(Modifier.width(8.dp))
-                                Text("Sign in with Gmail", fontWeight = FontWeight.SemiBold)
+                                Spacer(Modifier.width(12.dp))
+                                Text("Sign in with Gmail", fontWeight = FontWeight.Bold)
                             }
                         }
 

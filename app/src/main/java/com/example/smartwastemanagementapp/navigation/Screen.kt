@@ -10,4 +10,5 @@ sealed class Screen(val route: String) {
     object ViewReports : Screen("view_reports")
     object Map : Screen("map")
     object CompleteProfile : Screen("complete_profile")
+    object EditProfile : Screen("edit_profile")
 }

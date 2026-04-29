@@ -9,6 +9,7 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -20,6 +21,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -36,10 +38,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import coil.compose.rememberAsyncImagePainter
+import com.example.smartwastemanagementapp.ui.theme.EcoGreen40
 import com.example.smartwastemanagementapp.viewmodel.WasteViewModel
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
+import com.google.maps.android.compose.*
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @SuppressLint("MissingPermission")
 @OptIn(ExperimentalMaterial3Api::class)
@@ -53,9 +60,24 @@ fun ReportWasteScreen(
     val focusManager = LocalFocusManager.current
 
     var description   by remember { mutableStateOf("") }
+    var manualAddress by remember { mutableStateOf("") }
     var imageUri      by remember { mutableStateOf<Uri?>(null) }
     var location      by remember { mutableStateOf<Pair<Double, Double>?>(null) }
     var locationError by remember { mutableStateOf(false) }
+    var locationAccuracy by remember { mutableStateOf<Float?>(null) }
+    var locationCapturedAt by remember { mutableStateOf<Long?>(null) }
+    var photoCapturedAt by remember { mutableStateOf<Long?>(null) }
+    var locationStatusText by remember { mutableStateOf<String?>(null) }
+    var isRefreshingLocation by remember { mutableStateOf(false) }
+    var showSuccessDialog by remember { mutableStateOf(false) }
+
+    // Authentication check
+    fun isUserAuthenticated(): Boolean {
+        return com.google.firebase.auth.FirebaseAuth.getInstance().currentUser != null
+    }
+    
+    val currentUser = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
+    var showAuthError by remember { mutableStateOf(!isUserAuthenticated()) }
 
     val aiDescription by viewModel.aiDescription
     val moderationResult by viewModel.imageModeration
@@ -73,17 +95,84 @@ fun ReportWasteScreen(
 
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
 
+    fun fetchAddress(lat: Double, lng: Double) {
+        try {
+            val geocoder = android.location.Geocoder(context, java.util.Locale.getDefault())
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                geocoder.getFromLocation(lat, lng, 1) { addresses ->
+                    if (addresses.isNotEmpty()) {
+                        val addr = addresses[0]
+                        manualAddress = "${addr.getAddressLine(0)}, ${addr.locality ?: ""}".trim().trimEnd(',')
+                    }
+                }
+            } else {
+                @Suppress("DEPRECATION")
+                val addresses = geocoder.getFromLocation(lat, lng, 1)
+                if (!addresses.isNullOrEmpty()) {
+                    val addr = addresses[0]
+                    manualAddress = "${addr.getAddressLine(0)}, ${addr.locality ?: ""}".trim().trimEnd(',')
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("ReportWasteScreen", "Geocoding failed", e)
+        }
+    }
+
+    fun refreshLocation(onDone: (Boolean, Pair<Double, Double>?) -> Unit = { _, _ -> }) {
+        isRefreshingLocation = true
+        fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
+            .addOnSuccessListener { loc ->
+                isRefreshingLocation = false
+                if (loc != null) {
+                    val latLng = loc.latitude to loc.longitude
+                    location = latLng
+                    locationAccuracy = if (loc.hasAccuracy()) loc.accuracy else null
+                    locationCapturedAt = System.currentTimeMillis()
+                    locationStatusText = null
+                    locationError = false
+                    fetchAddress(loc.latitude, loc.longitude)
+                    onDone(true, latLng)
+                } else {
+                    locationError = true
+                    locationStatusText = "Could not fetch GPS location. Move to open sky and retry."
+                    onDone(false, null)
+                }
+            }
+            .addOnFailureListener {
+                isRefreshingLocation = false
+                locationError = true
+                locationStatusText = "Location permission or GPS issue. Please retry."
+                onDone(false, null)
+            }
+    }
+
     val tempUri = remember {
         val file = File(context.cacheDir, "temp_image_${System.currentTimeMillis()}.jpg")
         FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
     }
 
     val cameraLauncher  = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
-        if (success) imageUri = tempUri
+        if (success) {
+            imageUri = tempUri
+            photoCapturedAt = System.currentTimeMillis()
+            refreshLocation { ok, _ ->
+                locationStatusText = if (ok) {
+                    "Photo and GPS synced successfully."
+                } else {
+                    "Photo captured, but GPS sync failed. Tap refresh before submitting."
+                }
+            }
+        }
     }
     val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        uri?.let { imageUri = it }
+        uri?.let {
+            imageUri = it
+            photoCapturedAt = null
+            locationStatusText = "Gallery image selected. Refresh GPS once before submitting."
+        }
     }
+
+    val timeFormatter = remember { SimpleDateFormat("hh:mm a", Locale.getDefault()) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -91,18 +180,10 @@ fun ReportWasteScreen(
         val locGranted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
                          permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
         if (locGranted) {
-            fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
-                .addOnSuccessListener { loc ->
-                    if (loc != null) {
-                        location = loc.latitude to loc.longitude
-                        locationError = false
-                    } else {
-                        locationError = true
-                    }
-                }
-                .addOnFailureListener { locationError = true }
+            refreshLocation()
         } else {
             locationError = true
+            locationStatusText = "Location permission denied. Allow permission to submit report."
         }
     }
 
@@ -130,6 +211,49 @@ fun ReportWasteScreen(
                 ?.copy(Bitmap.Config.ARGB_8888, false)
         }
     } catch (_: Exception) { null }
+
+    if (showSuccessDialog) {
+        val lastReport = viewModel.reports.collectAsState().value.firstOrNull()
+        AlertDialog(
+            onDismissRequest = {
+                showSuccessDialog = false
+                onSuccess()
+            },
+            title = { 
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.CheckCircle, null, tint = EcoGreen40, modifier = Modifier.size(28.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Report Submitted!") 
+                }
+            },
+            text = {
+                Column {
+                    Text("Thank you for your report. It has been sent for admin moderation.")
+                    Spacer(Modifier.height(12.dp))
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text("Current Status:", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                            Text("⏳ PENDING APPROVAL", color = MaterialTheme.colorScheme.tertiary, fontWeight = FontWeight.ExtraBold)
+                            Spacer(Modifier.height(4.dp))
+                            Text("Note: Wait for admin approval to see your report on the map.", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    showSuccessDialog = false
+                    onSuccess()
+                }, shape = RoundedCornerShape(12.dp)) {
+                    Text("OK, GOT IT")
+                }
+            }
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -270,20 +394,23 @@ fun ReportWasteScreen(
             ) {
                 Spacer(Modifier.height(10.dp))
                 if (isAnalyzing) {
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape    = RoundedCornerShape(14.dp),
-                        color    = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Row(
-                            modifier = Modifier.padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                            Spacer(Modifier.width(10.dp))
-                            Text("Gemini AI is analyzing the image…", style = MaterialTheme.typography.bodySmall)
-                        }
+                        CircularProgressIndicator(modifier = Modifier.size(32.dp), strokeWidth = 3.dp)
+                        Spacer(Modifier.height(10.dp))
+                        Text(
+                            "AI is analyzing your photo...",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            "Detecting waste type & ensuring safety",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 } else {
                     Button(
@@ -303,6 +430,27 @@ fun ReportWasteScreen(
                         Icon(Icons.Default.AutoAwesome, null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
                         Text("✨ Analyze with Gemini AI", fontWeight = FontWeight.SemiBold)
+                    }
+                }
+            }
+
+            // AI Generated Suggestion Info
+            if (aiDescription != null && !isAnalyzing) {
+                Spacer(Modifier.height(10.dp))
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    color = EcoGreen40.copy(alpha = 0.12f),
+                    border = BorderStroke(1.dp, EcoGreen40.copy(alpha = 0.3f))
+                ) {
+                    Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.AutoAwesome, null, tint = EcoGreen40, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(10.dp))
+                        Text(
+                            "AI auto-filled the description based on your photo!",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }
@@ -373,9 +521,93 @@ fun ReportWasteScreen(
             Spacer(Modifier.height(20.dp))
 
             // ── Step 3: Location ──────────────────────────────────
-            SectionHeader("3", "Location", "Auto-detected from GPS")
+            SectionHeader("3", "Location", "Manual address or GPS detected")
 
             Spacer(Modifier.height(10.dp))
+
+            // Map Picker Integration
+            Card(
+                modifier = Modifier.fillMaxWidth().height(200.dp),
+                shape = RoundedCornerShape(16.dp),
+                elevation = CardDefaults.cardElevation(2.dp)
+            ) {
+                Box {
+                    val cameraPositionState = rememberCameraPositionState {
+                        position = com.google.android.gms.maps.model.CameraPosition.fromLatLngZoom(
+                            com.google.android.gms.maps.model.LatLng(location?.first ?: 20.5937, location?.second ?: 78.9629),
+                            if (location != null) 15f else 5f
+                        )
+                    }
+
+                    // Sync camera ONLY once when location is first detected, then let user move it
+                    var initialLocationSet by remember { mutableStateOf(false) }
+                    LaunchedEffect(location) {
+                        if (location != null && !initialLocationSet) {
+                            cameraPositionState.animate(
+                                com.google.android.gms.maps.CameraUpdateFactory.newLatLngZoom(
+                                    com.google.android.gms.maps.model.LatLng(location!!.first, location!!.second), 15f
+                                )
+                            )
+                            initialLocationSet = true
+                        }
+                    }
+
+                    GoogleMap(
+                        modifier = Modifier.fillMaxSize(),
+                        cameraPositionState = cameraPositionState,
+                        onMapClick = { latLng ->
+                            location = latLng.latitude to latLng.longitude
+                            locationAccuracy = 0f // Manual pin
+                            locationCapturedAt = System.currentTimeMillis()
+                            fetchAddress(latLng.latitude, latLng.longitude)
+                        },
+                        uiSettings = MapUiSettings(zoomControlsEnabled = false, myLocationButtonEnabled = false)
+                    ) {
+                        location?.let {
+                            Marker(
+                                state = MarkerState(com.google.android.gms.maps.model.LatLng(it.first, it.second)),
+                                title = "Waste Location"
+                            )
+                        }
+                    }
+
+                    Surface(
+                        modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f)
+                    ) {
+                        Text(
+                            "Tap map to pin location",
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            OutlinedTextField(
+                value = manualAddress,
+                onValueChange = { manualAddress = it },
+                label = { Text("Manual Address") },
+                placeholder = { Text("Enter address if GPS is inaccurate...") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                trailingIcon = {
+                    if (location != null) {
+                        IconButton(onClick = { location?.let { fetchAddress(it.first, it.second) } }) {
+                            Icon(Icons.Default.MyLocation, "Detect again")
+                        }
+                    }
+                },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                )
+            )
+
+            Spacer(Modifier.height(12.dp))
 
             Surface(
                 modifier = Modifier.fillMaxWidth(),
@@ -411,10 +643,24 @@ fun ReportWasteScreen(
                         )
                         if (location != null) {
                             Text(
-                                text  = "Lat: ${"%.5f".format(location!!.first)}, Lng: ${"%.5f".format(location!!.second)}",
+                                text  = "Lat: ${"%.6f".format(location!!.first)}, Lng: ${"%.6f".format(location!!.second)}",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                            locationAccuracy?.let {
+                                Text(
+                                    text = "Accuracy: ${"%.1f".format(it)} m",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            locationCapturedAt?.let {
+                                Text(
+                                    text = "Captured: ${timeFormatter.format(Date(it))}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         } else if (!locationError) {
                             LinearProgressIndicator(
                                 modifier = Modifier.fillMaxWidth().padding(top = 4.dp).height(2.dp),
@@ -439,12 +685,56 @@ fun ReportWasteScreen(
                         ) {
                             Icon(Icons.Default.Refresh, "Retry location", tint = MaterialTheme.colorScheme.error)
                         }
+                    } else {
+                        Spacer(Modifier.width(8.dp))
+                        IconButton(
+                            onClick = { refreshLocation() }
+                        ) {
+                            Icon(Icons.Default.Refresh, "Refresh location", tint = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                }
+            }
+
+            locationStatusText?.let { status ->
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = status,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (locationError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            if (imageUri != null && photoCapturedAt != null) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = "Photo time: ${timeFormatter.format(Date(photoCapturedAt!!))}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            // Authentication Error
+            if (!isUserAuthenticated()) {
+                Spacer(Modifier.height(10.dp))
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape    = RoundedCornerShape(12.dp),
+                    color    = MaterialTheme.colorScheme.errorContainer
+                ) {
+                    Row(modifier = Modifier.padding(12.dp, 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Error, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("❌ You must be logged in to submit reports", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
 
             // Error message
-            errorMsg?.let { err ->
+            val filteredError = errorMsg?.takeIf { "Object does not exist at location" !in it }
+            filteredError?.let { err ->
                 Spacer(Modifier.height(10.dp))
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
@@ -469,31 +759,94 @@ fun ReportWasteScreen(
                     Text("Submitting your report…", style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
+            } else if (isRefreshingLocation) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.secondary)
+                    Spacer(Modifier.height(8.dp))
+                    Text("Refreshing GPS before submission…", style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             } else {
+                val isUnsafe = moderationResult?.let { it.score < 0.60 || it.label.equals("unsafe", ignoreCase = true) } ?: false
+                val needsAnalysis = imageUri != null && moderationResult == null
+
                 Button(
                     onClick = {
-                        location?.let { loc ->
+                        // AUTHENTICATION CHECK
+                        if (!isUserAuthenticated()) {
+                            android.widget.Toast.makeText(context, "❌ Please login first to submit a report", android.widget.Toast.LENGTH_LONG).show()
+                            return@Button
+                        }
+
+                        if (description.isBlank()) {
+                            android.widget.Toast.makeText(context, "Please enter a description", android.widget.Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
+                        if (needsAnalysis) {
+                            android.widget.Toast.makeText(context, "Please analyze the image with AI before submitting.", android.widget.Toast.LENGTH_LONG).show()
+                            return@Button
+                        }
+
+                        val submissionLogic = { lat: Double, lon: Double, acc: Float ->
                             viewModel.submitReport(
+                                context = context,
                                 description = description,
-                                imageUri    = imageUri,
-                                latitude    = loc.first,
-                                longitude   = loc.second,
-                                onSuccess   = onSuccess
+                                address = manualAddress.ifBlank { "Address not provided" },
+                                imageUri = imageUri,
+                                latitude = lat,
+                                longitude = lon,
+                                locationAccuracyMeters = acc,
+                                onSuccess = {
+                                    showSuccessDialog = true
+                                }
                             )
+                        }
+
+                        // Use existing location if already captured/pinned, otherwise fetch fresh
+                        if (location != null) {
+                            submissionLogic(location!!.first, location!!.second, locationAccuracy ?: 0f)
+                        } else {
+                            refreshLocation { ok, freshLoc ->
+                                if (ok && freshLoc != null) {
+                                    submissionLogic(freshLoc.first, freshLoc.second, locationAccuracy ?: 0f)
+                                } else {
+                                    android.widget.Toast.makeText(context, "GPS Error: Please pin a location on the map", android.widget.Toast.LENGTH_LONG).show()
+                                }
+                            }
                         }
                     },
                     modifier = Modifier.fillMaxWidth().height(56.dp),
                     shape    = RoundedCornerShape(16.dp),
-                    enabled  = description.isNotBlank() && location != null && !locationError,
+                    enabled  = description.isNotBlank() && location != null && !locationError && !isRefreshingLocation && !isUnsafe && isUserAuthenticated(),
                     colors   = ButtonDefaults.buttonColors(
                         containerColor         = MaterialTheme.colorScheme.primary,
                         disabledContainerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
                     ),
                     elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
                 ) {
-                    Icon(Icons.Default.Send, null, modifier = Modifier.size(20.dp))
+                    Icon(Icons.AutoMirrored.Filled.Send, null, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(8.dp))
                     Text("Submit Report", fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                }
+
+                if (needsAnalysis) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "⚠️ Please analyze the image before submitting",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.tertiary,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+
+                if (!isUserAuthenticated()) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "🔒 Please login to submit reports",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        fontWeight = FontWeight.Medium
+                    )
                 }
 
                 if (location == null && !locationError) {
@@ -503,6 +856,10 @@ fun ReportWasteScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+                if (isRefreshingLocation) {
+                    Spacer(Modifier.height(8.dp))
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                 }
             }
 

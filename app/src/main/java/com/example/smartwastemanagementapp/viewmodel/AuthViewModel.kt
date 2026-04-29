@@ -39,7 +39,12 @@ class AuthViewModel : ViewModel() {
     private val _isProfileComplete = mutableStateOf(false)
     val isProfileComplete: State<Boolean> = _isProfileComplete
 
-    private val adminEmails = setOf("admin@civicfix.com")
+    private val adminEmails by lazy {
+        BuildConfig.ADMIN_EMAILS
+            .split(",")
+            .map { it.trim().lowercase() }
+            .filter { it.isNotBlank() }
+    }
 
     init {
         auth.currentUser?.uid?.let { fetchUserProfile(it) }
@@ -132,7 +137,7 @@ class AuthViewModel : ViewModel() {
                         age = age,
                         phoneNumber = phone,
                         gender = gender,
-                        role = AuthRole.USER.dbValue,
+                        role = if (isAdminEmail(email)) AuthRole.ADMIN.dbValue else AuthRole.USER.dbValue,
                         authProvider = "email"
                     )
                     database.child(uid).setValue(newUser)
@@ -177,20 +182,29 @@ class AuthViewModel : ViewModel() {
             }
     }
 
-    fun updateProfile(name: String, age: String, gender: String, onSuccess: () -> Unit) {
+    fun updateProfile(name: String, age: String, gender: String, phoneNumber: String = "", onSuccess: () -> Unit) {
         val uid = auth.currentUser?.uid ?: return
         val currentEmail = auth.currentUser?.email ?: ""
         val currentPhone = auth.currentUser?.phoneNumber ?: ""
+        val currentProfile = _userProfile.value
         
+        val finalPhone = when {
+            phoneNumber.isNotBlank() -> phoneNumber
+            currentProfile?.phoneNumber?.isNotBlank() == true -> currentProfile.phoneNumber
+            else -> currentPhone
+        }
+
         val updatedUser = User(
             uid = uid,
             name = name,
-            email = currentEmail,
+            email = currentProfile?.email?.ifBlank { currentEmail } ?: currentEmail,
             age = age,
-            phoneNumber = currentPhone,
+            phoneNumber = finalPhone,
             gender = gender,
-            role = AuthRole.USER.dbValue,
-            authProvider = if (currentPhone.isNotBlank()) "phone" else "email"
+            role = currentProfile?.role?.ifBlank { AuthRole.USER.dbValue } ?: AuthRole.USER.dbValue,
+            authProvider = currentProfile?.authProvider?.ifBlank {
+                if (finalPhone.isNotBlank()) "phone" else "email"
+            } ?: if (finalPhone.isNotBlank()) "phone" else "email"
         )
         
         _isLoading.value = true
@@ -294,31 +308,42 @@ class AuthViewModel : ViewModel() {
                         val uid = firebaseUser.uid
                         val email = firebaseUser.email.orEmpty()
                         val displayName = firebaseUser.displayName.orEmpty()
-
-                        // Update local state immediately
-                        val newUser = User(
-                            uid = uid,
-                            name = displayName,
-                            email = email,
-                            role = if (isAdminEmail(email)) AuthRole.ADMIN.dbValue else AuthRole.USER.dbValue,
-                            authProvider = "google"
-                        )
-                        
-                        _userProfile.value = newUser
-                        _isLoggedIn.value = true
-                        syncRoleFlags()
-                        
-                        android.util.Log.d("AuthViewModel", "State updated, triggering onSuccess")
-                        onSuccess() // Navigate immediately
-
-                        // Update database in background
-                        database.child(uid).setValue(newUser)
-                            .addOnCompleteListener { dbTask ->
-                                if (!dbTask.isSuccessful) {
-                                    android.util.Log.e("AuthViewModel", "Database save failed: ${dbTask.exception?.message}")
-                                } else {
-                                    android.util.Log.d("AuthViewModel", "Database save successful")
+                        database.child(uid).get()
+                            .addOnSuccessListener { snapshot ->
+                                val existingUser = snapshot.getValue(User::class.java)
+                                val role = when {
+                                    !existingUser?.role.isNullOrBlank() -> existingUser!!.role
+                                    isAdminEmail(email) -> AuthRole.ADMIN.dbValue
+                                    else -> AuthRole.USER.dbValue
                                 }
+
+                                val mergedUser = User(
+                                    uid = uid,
+                                    name = displayName.ifBlank { existingUser?.name.orEmpty() },
+                                    email = email.ifBlank { existingUser?.email.orEmpty() },
+                                    age = existingUser?.age.orEmpty(),
+                                    phoneNumber = existingUser?.phoneNumber.orEmpty(),
+                                    gender = existingUser?.gender.orEmpty(),
+                                    role = role,
+                                    authProvider = "google"
+                                )
+
+                                database.child(uid).setValue(mergedUser)
+                                    .addOnSuccessListener {
+                                        _userProfile.value = mergedUser
+                                        _isLoggedIn.value = true
+                                        _isProfileComplete.value = mergedUser.name.isNotBlank() && mergedUser.age.isNotBlank()
+                                        syncRoleFlags()
+                                        onSuccess()
+                                    }
+                                    .addOnFailureListener { dbError ->
+                                        _error.value = "❌ Database error: ${dbError.localizedMessage ?: "Failed to save profile"}"
+                                        _isLoggedIn.value = false
+                                    }
+                            }
+                            .addOnFailureListener {
+                                _error.value = "❌ Could not verify profile in database"
+                                _isLoggedIn.value = false
                             }
                     } else {
                         val exception = task.exception
@@ -375,11 +400,15 @@ class AuthViewModel : ViewModel() {
 
     private fun isAdminEmail(email: String?): Boolean {
         if (email.isNullOrBlank()) return false
-        return adminEmails.any { it.equals(email, ignoreCase = true) }
+        val lowerEmail = email.trim().lowercase()
+        return adminEmails.contains(lowerEmail)
     }
 
     private fun syncRoleFlags() {
-        val role = AuthRole.from(_userProfile.value?.role)
-        _isAdmin.value = role == AuthRole.ADMIN || isAdminEmail(_userProfile.value?.email)
+        val user = _userProfile.value
+        val isEmailAdmin = isAdminEmail(user?.email ?: auth.currentUser?.email)
+        val isRoleAdmin = user?.role?.equals("admin", ignoreCase = true) == true
+        
+        _isAdmin.value = isEmailAdmin || isRoleAdmin
     }
 }

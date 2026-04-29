@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -80,9 +81,17 @@ class MainActivity : ComponentActivity() {
                     composable(Screen.CompleteProfile.route) {
                         CompleteProfileScreen(
                             viewModel = authViewModel,
+                            isEditMode = false,
                             onComplete = {
                                 navController.navigate(Screen.Home.route) { popUpTo(0) }
                             }
+                        )
+                    }
+                    composable(Screen.EditProfile.route) {
+                        CompleteProfileScreen(
+                            viewModel = authViewModel,
+                            isEditMode = true,
+                            onComplete = { navController.popBackStack() }
                         )
                     }
                     composable(Screen.Home.route) {
@@ -90,14 +99,24 @@ class MainActivity : ComponentActivity() {
                             onReportWaste = { navController.navigate(Screen.ReportWaste.route) },
                             onViewReports = { navController.navigate(Screen.ViewReports.route) },
                             onViewMap = { navController.navigate(Screen.Map.route) },
+                            onEditProfile = { navController.navigate(Screen.EditProfile.route) },
                             onLogout = {
                                 authViewModel.logout()
                                 navController.navigate(Screen.Login.route) { popUpTo(0) }
                             },
+                            onAdminDashboard = { navController.navigate(Screen.AdminDashboard.route) },
                             authViewModel = authViewModel
                         )
                     }
                     composable(Screen.AdminDashboard.route) {
+                        if (!authViewModel.isAdmin.value) {
+                            LaunchedEffect(Unit) {
+                                navController.navigate(Screen.Home.route) {
+                                    popUpTo(Screen.AdminDashboard.route) { inclusive = true }
+                                }
+                            }
+                            return@composable
+                        }
                         val wasteViewModel: WasteViewModel = viewModel()
                         AdminDashboardScreen(
                             onLogout = {
@@ -109,7 +128,8 @@ class MainActivity : ComponentActivity() {
                                     popUpTo(Screen.AdminDashboard.route)
                                 }
                             },
-                            viewModel = wasteViewModel
+                            viewModel = wasteViewModel,
+                            authViewModel = authViewModel
                         )
                     }
                     composable(Screen.ReportWaste.route) {

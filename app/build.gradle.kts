@@ -32,6 +32,8 @@ android {
 
         buildConfigField("String", "GEMINI_API_KEY", "\"${readLocalProperty("GEMINI_API_KEY")}\"")
         buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"${readLocalProperty("GOOGLE_WEB_CLIENT_ID")}\"")
+        buildConfigField("String", "GEMINI_MODEL", "\"${readLocalProperty("GEMINI_MODEL").ifBlank { "gemini-2.5-flash" }}\"")
+        buildConfigField("String", "ADMIN_EMAILS", "\"${readLocalProperty("ADMIN_EMAILS")}\"")
 
         manifestPlaceholders["MAPS_API_KEY"] = readLocalProperty("MAPS_API_KEY")
     }
