@@ -261,7 +261,11 @@ fun LoginScreen(
                                     label = { Text(stringResource(R.string.email_address)) },
                                     leadingIcon = { Icon(Icons.Default.Email, null) },
                                     modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(14.dp)
+                                    shape = RoundedCornerShape(14.dp),
+                                    keyboardOptions = KeyboardOptions(
+                                        keyboardType = KeyboardType.Email,
+                                        autoCorrect = false
+                                    )
                                 )
                                 Spacer(Modifier.height(12.dp))
                                 OutlinedTextField(
@@ -276,7 +280,8 @@ fun LoginScreen(
                                         }
                                     },
                                     modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(14.dp)
+                                    shape = RoundedCornerShape(14.dp),
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
                                 )
                                 
                                 TextButton(

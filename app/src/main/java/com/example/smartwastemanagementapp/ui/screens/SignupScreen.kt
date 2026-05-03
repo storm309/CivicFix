@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -77,7 +78,11 @@ fun SignupScreen(
                         leadingIcon = { Icon(Icons.Default.Person, null) },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(14.dp),
-                        colors = fieldColors()
+                        colors = fieldColors(),
+                        keyboardOptions = KeyboardOptions(
+                            capitalization = KeyboardCapitalization.Words,
+                            keyboardType = KeyboardType.Text
+                        )
                     )
 
                     Spacer(Modifier.height(16.dp))
@@ -89,7 +94,11 @@ fun SignupScreen(
                         leadingIcon = { Icon(Icons.Default.Email, null) },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(14.dp),
-                        colors = fieldColors()
+                        colors = fieldColors(),
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Email,
+                            autoCorrect = false
+                        )
                     )
 
                     Spacer(Modifier.height(16.dp))
@@ -162,7 +171,7 @@ fun SignupScreen(
                         CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
                     } else {
                         Button(
-                            onClick = { viewModel.signUp(email, password, name, age, phone, gender, onSignupSuccess) },
+                            onClick = { viewModel.signUp(name, email, age, phone, gender, password, onSignupSuccess) },
                             modifier = Modifier.fillMaxWidth().height(54.dp),
                             shape = RoundedCornerShape(14.dp)
                         ) {

@@ -15,8 +15,8 @@ class WasteRepository {
 
     private val reportsRef = firebaseDb.getReference("reports")
 
-    // Use the EXACT bucket name from google-services.json to fix "Object not found"
-    private val storage = FirebaseStorage.getInstance("gs://civicfix-92e86.firebasestorage.app")
+    // Use default instance which automatically uses the bucket from google-services.json
+    private val storage = FirebaseStorage.getInstance()
 
     suspend fun submitReport(
         description: String,
@@ -41,18 +41,22 @@ class WasteRepository {
                 val fileName = "waste_${System.currentTimeMillis()}_${UUID.randomUUID().toString().take(5)}.jpg"
                 val imageRef = storage.reference.child("waste_images/$fileName")
 
-                android.util.Log.d("WasteRepository", "Uploading image: $fileName")
-                val uploadTask = imageRef.putBytes(imageBytes).await()
-                val url = uploadTask.storage.downloadUrl.await().toString()
+                android.util.Log.d("WasteRepository", "Uploading image: $fileName to ${imageRef.path}")
+                imageRef.putBytes(imageBytes).await()
+                
+                // Get the long HTTPS URL
+                val url = imageRef.downloadUrl.await().toString()
 
-                android.util.Log.d("WasteRepository", "✓ Image uploaded: ${url.take(50)}...")
+                android.util.Log.d("WasteRepository", "✓ Image uploaded successfully. URL: $url")
                 url
             } catch (imgError: Exception) {
-                android.util.Log.w("WasteRepository", "Image upload failed: ${imgError.message}, continuing without image")
+                android.util.Log.e("WasteRepository", "✗ Image upload failed: ${imgError.message}")
+                android.util.Log.e("WasteRepository", "Full error: ${imgError.stackTraceToString()}")
+                // Return empty string but log error clearly
                 ""
             }
         } else {
-            android.util.Log.d("WasteRepository", "→ No image provided")
+            android.util.Log.d("WasteRepository", "→ No image provided or bytes empty")
             ""
         }
 
@@ -145,11 +149,15 @@ class WasteRepository {
     }
 
     suspend fun rewardUser(userId: String, points: Int): Result<Unit> = try {
+        android.util.Log.d("WasteRepository", "Attempting to reward user $userId with $points points")
         val userPointsRef = firebaseDb.getReference("users").child(userId).child("impactPoints")
-        val currentPoints = userPointsRef.get().await().getValue(Int::class.java) ?: 0
+        val snapshot = userPointsRef.get().await()
+        val currentPoints = snapshot.getValue(Int::class.java) ?: 0
         userPointsRef.setValue(currentPoints + points).await()
+        android.util.Log.d("WasteRepository", "✓ Successfully rewarded user $userId. New total: ${currentPoints + points}")
         Result.success(Unit)
     } catch (e: Exception) {
+        android.util.Log.e("WasteRepository", "✗ Failed to reward user $userId: ${e.message}")
         Result.failure(e)
     }
 
@@ -159,6 +167,7 @@ class WasteRepository {
         moderatedBy: String,
         note: String
     ): Result<Unit> = try {
+        android.util.Log.d("WasteRepository", "Updating moderation status for $reportId to $status")
         val updates = mutableMapOf<String, Any>(
             "moderationStatus" to status.dbValue,
             "moderationUpdatedAt" to System.currentTimeMillis(),
@@ -170,14 +179,28 @@ class WasteRepository {
         
         // REWARD LOGIC: If approved, give points to the original reporter
         if (status == ReportModerationStatus.APPROVED) {
-            val reporterId = reportsRef.child(reportId).child("reportedBy").get().await().getValue(String::class.java)
-            if (reporterId != null) {
-                rewardUser(reporterId, 50) // Give 50 points for approved report
+            android.util.Log.d("WasteRepository", "Report approved! Fetching reporter ID for $reportId")
+            try {
+                // Fetch directly to avoid any parsing issues with the whole object
+                val reporterSnapshot = reportsRef.child(reportId).child("reportedBy").get().await()
+                val reporterId = reporterSnapshot.getValue(String::class.java)
+                
+                android.util.Log.d("WasteRepository", "Reporter ID fetched: $reporterId")
+                
+                if (!reporterId.isNullOrBlank()) {
+                    android.util.Log.d("WasteRepository", "Triggering reward for $reporterId")
+                    rewardUser(reporterId, 50) 
+                } else {
+                    android.util.Log.w("WasteRepository", "Could not find reporter ID for report $reportId. Snap: ${reporterSnapshot.value}")
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("WasteRepository", "Error fetching reporter ID: ${e.message}")
             }
         }
 
         Result.success(Unit)
     } catch (e: Exception) {
+        android.util.Log.e("WasteRepository", "✗ Failed to update moderation status: ${e.message}")
         Result.failure(e)
     }
 }

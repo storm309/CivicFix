@@ -141,18 +141,34 @@ fun ReportAdminCard(report: com.example.smartwastemanagementapp.model.WasteRepor
 
             // Photo of the report - ensured to be shown
             if (report.imageUrl.isNotBlank()) {
-                Card(modifier = Modifier.fillMaxWidth().height(200.dp), shape = RoundedCornerShape(16.dp)) {
+                Card(modifier = Modifier.fillMaxWidth().height(220.dp), shape = RoundedCornerShape(16.dp), elevation = CardDefaults.cardElevation(4.dp)) {
                     AsyncImage(
                         model = report.imageUrl,
                         contentDescription = stringResource(R.string.step_photo_title),
                         modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
+                        contentScale = ContentScale.Crop,
+                        onState = { state ->
+                            when (state) {
+                                is coil.compose.AsyncImagePainter.State.Error -> {
+                                    android.util.Log.e("AdminDashboard", "Error loading image: ${report.imageUrl}")
+                                    android.util.Log.e("AdminDashboard", "Error cause: ${state.result.throwable.message}")
+                                }
+                                is coil.compose.AsyncImagePainter.State.Success -> {
+                                    android.util.Log.d("AdminDashboard", "Success loading image: ${report.imageUrl}")
+                                }
+                                else -> {}
+                            }
+                        }
                     )
                 }
                 Spacer(Modifier.height(12.dp))
             } else {
-                Box(modifier = Modifier.fillMaxWidth().height(100.dp).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(16.dp)), contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.ImageNotSupported, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Box(modifier = Modifier.fillMaxWidth().height(120.dp).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(16.dp)), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(Icons.Default.ImageNotSupported, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(32.dp))
+                        Spacer(Modifier.height(4.dp))
+                        Text(stringResource(R.string.no_reports_yet), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
                 Spacer(Modifier.height(12.dp))
             }

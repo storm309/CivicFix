@@ -28,26 +28,38 @@ import com.example.smartwastemanagementapp.viewmodel.WasteViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ViewReportsScreen(onBack: () -> Unit, viewModel: WasteViewModel) {
+fun ViewReportsScreen(
+    onBack: () -> Unit,
+    viewModel: WasteViewModel,
+    authViewModel: com.example.smartwastemanagementapp.viewmodel.AuthViewModel
+) {
     val reports by viewModel.reports.collectAsState()
     val isLoading by viewModel.isLoading
     var selectedFilter by remember { mutableStateOf("All") }
 
+    val isAdmin = authViewModel.isAdmin.value
+    val currentUserId = authViewModel.userProfile.value?.uid ?: ""
+
     LaunchedEffect(Unit) { viewModel.fetchReports() }
 
-    val filteredReports = remember(reports, selectedFilter) {
+    val filteredReports = remember(reports, selectedFilter, isAdmin, currentUserId) {
         val sorted = reports.sortedByDescending { it.priority } // Sort by most supported first
+        
+        // Step 1: Filter by Ownership (User only sees their own, Admin sees all)
+        val ownedReports = if (isAdmin) sorted else sorted.filter { it.reportedBy == currentUserId }
+        
+        // Step 2: Filter by Status
         when (selectedFilter) {
-            "Pending" -> sorted.filter { 
+            "Pending" -> ownedReports.filter { 
                 ReportModerationStatus.from(it.moderationStatus) == ReportModerationStatus.PENDING_APPROVAL 
             }
-            "Approved" -> sorted.filter { 
+            "Approved" -> ownedReports.filter { 
                 ReportModerationStatus.from(it.moderationStatus) == ReportModerationStatus.APPROVED 
             }
-            "Rejected" -> sorted.filter { 
+            "Rejected" -> ownedReports.filter { 
                 ReportModerationStatus.from(it.moderationStatus) == ReportModerationStatus.REJECTED 
             }
-            else -> sorted
+            else -> ownedReports
         }
     }
 

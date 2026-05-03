@@ -98,14 +98,16 @@ fun HomeScreen(
 
     Scaffold(
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick           = onReportWaste,
-                icon              = { Icon(Icons.Default.Add, null) },
-                text              = { Text(stringResource(R.string.report_waste), fontWeight = FontWeight.Bold) },
-                containerColor    = MaterialTheme.colorScheme.primary,
-                contentColor      = Color.White,
-                modifier          = Modifier.shadow(8.dp, RoundedCornerShape(16.dp))
-            )
+            if (!authViewModel.isAdmin.value) {
+                ExtendedFloatingActionButton(
+                    onClick           = onReportWaste,
+                    icon              = { Icon(Icons.Default.Add, null) },
+                    text              = { Text(stringResource(R.string.report_waste), fontWeight = FontWeight.Bold) },
+                    containerColor    = MaterialTheme.colorScheme.primary,
+                    contentColor      = Color.White,
+                    modifier          = Modifier.shadow(8.dp, RoundedCornerShape(16.dp))
+                )
+            }
         }
     ) { scaffoldPadding ->
         Column(
@@ -212,21 +214,31 @@ fun HomeScreen(
                             InfoChip(icon = Icons.Default.Phone, text = user?.phoneNumber?.ifBlank { stringResource(R.string.age_not_available) } ?: stringResource(R.string.age_not_available))
                         }
 
-                        // Display Impact Points
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.tertiaryContainer,
-                            modifier = Modifier.padding(top = 8.dp)
-                        ) {
-                            Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.Stars, null, tint = MaterialTheme.colorScheme.onTertiaryContainer, modifier = Modifier.size(16.dp))
-                                Spacer(Modifier.width(4.dp))
-                                Text(
-                                    stringResource(R.string.impact_points, user?.impactPoints ?: 0),
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onTertiaryContainer
-                                )
+                        // Display Impact Points (Only for non-admins)
+                        if (!authViewModel.isAdmin.value) {
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.tertiaryContainer,
+                                modifier = Modifier.padding(top = 8.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Default.Stars,
+                                        null,
+                                        tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                    Text(
+                                        stringResource(R.string.impact_points, user?.impactPoints ?: 0),
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onTertiaryContainer
+                                    )
+                                }
                             }
                         }
                         
@@ -249,9 +261,11 @@ fun HomeScreen(
                     .padding(top = 20.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                StatCard(stringResource(R.string.filter_all), "🗂️", EcoGreen40, modifier = Modifier.weight(1f), onClick = onViewReports)
-                StatCard(stringResource(R.string.filter_pending), "⏳", MaterialTheme.colorScheme.tertiary, modifier = Modifier.weight(1f), onClick = onViewReports)
-                StatCard(stringResource(R.string.filter_approved), "✅", Teal40, modifier = Modifier.weight(1f), onClick = onViewReports)
+                if (!authViewModel.isAdmin.value) {
+                    StatCard(stringResource(R.string.filter_all), "🗂️", EcoGreen40, modifier = Modifier.weight(1f), onClick = onViewReports)
+                    StatCard(stringResource(R.string.filter_pending), "⏳", MaterialTheme.colorScheme.tertiary, modifier = Modifier.weight(1f), onClick = onViewReports)
+                    StatCard(stringResource(R.string.filter_approved), "✅", Teal40, modifier = Modifier.weight(1f), onClick = onViewReports)
+                }
             }
 
             Spacer(Modifier.height(24.dp))
@@ -282,20 +296,22 @@ fun HomeScreen(
                 Spacer(Modifier.height(14.dp))
             }
 
-            AnimatedVisibility(
-                visible = visible,
-                enter   = fadeIn(tween(300)) + slideInVertically(tween(300)) { it / 2 }
-            ) {
-                ActionCard(
-                    title    = stringResource(R.string.report_waste),
-                    subtitle = stringResource(R.string.snap_photo_report),
-                    icon     = Icons.Default.Add,
-                    gradient = Brush.linearGradient(listOf(EcoGreen40, EcoGreen60)),
-                    onClick  = onReportWaste,
-                    modifier = Modifier.padding(horizontal = 20.dp)
-                )
+            if (!authViewModel.isAdmin.value) {
+                AnimatedVisibility(
+                    visible = visible,
+                    enter   = fadeIn(tween(300)) + slideInVertically(tween(300)) { it / 2 }
+                ) {
+                    ActionCard(
+                        title    = stringResource(R.string.report_waste),
+                        subtitle = stringResource(R.string.snap_photo_report),
+                        icon     = Icons.Default.Add,
+                        gradient = Brush.linearGradient(listOf(EcoGreen40, EcoGreen60)),
+                        onClick  = onReportWaste,
+                        modifier = Modifier.padding(horizontal = 20.dp)
+                    )
+                }
+                Spacer(Modifier.height(14.dp))
             }
-            Spacer(Modifier.height(14.dp))
 
             AnimatedVisibility(
                 visible = visible,

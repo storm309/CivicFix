@@ -139,7 +139,8 @@ class MainActivity : AppCompatActivity() {
                         val wasteViewModel: WasteViewModel = viewModel()
                         ViewReportsScreen(
                             onBack = { navController.popBackStack() },
-                            viewModel = wasteViewModel
+                            viewModel = wasteViewModel,
+                            authViewModel = authViewModel
                         )
                     }
                     composable(Screen.Map.route) {

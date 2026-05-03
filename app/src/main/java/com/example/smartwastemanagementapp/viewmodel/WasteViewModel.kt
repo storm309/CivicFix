@@ -181,16 +181,18 @@ class WasteViewModel(private val repository: WasteRepository = WasteRepository()
                             content {
                                 image(bitmap)
                                 text(
-                                    "You are a civic waste management assistant. " +
-                                        "Look at this image and write a clear, concise 1-2 sentence " +
-                                        "description of the waste issue for a complaint report. " +
-                                        "Mention the type of waste and the severity. " +
-                                        "Provide the description in BOTH English and Hindi. " +
+                                    "You are an expert environmental and waste management inspector. " +
+                                        "Look at this image and write a detailed, professional 2-3 sentence " +
+                                        "description of the waste issue for a formal complaint report. " +
+                                        "1. Identify the specific materials (e.g., plastic, organic, construction debris, electronics). " +
+                                        "2. Estimate the volume/severity (e.g., overflowing bin, scattered litter, large dump). " +
+                                        "3. Mention any immediate risks (e.g., blocking a sidewalk, near a water body, hygiene hazard). " +
+                                        "Provide the description in BOTH English and Hindi. The Hindi should be professional and natural-sounding. " +
                                         "Respond strictly in this format:\n" +
                                         "EN: <english_description>\n" +
                                         "HI: <hindi_description>\n" +
                                         "SAFETY:<score_0_to_1>|<safe_or_unsafe>|<reason>\n" +
-                                        "Mark unsafe if image is unrelated, explicit, abusive, or not waste evidence."
+                                        "Mark unsafe if image is unrelated to waste, explicit, abusive, or contains personal identification."
                                 )
                             }
                         )

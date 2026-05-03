@@ -12,7 +12,10 @@ import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.PhoneAuthCredential
 import com.google.firebase.auth.PhoneAuthOptions
 import com.google.firebase.auth.PhoneAuthProvider
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ValueEventListener
 import java.util.concurrent.TimeUnit
 
 class AuthViewModel : ViewModel() {
@@ -39,6 +42,8 @@ class AuthViewModel : ViewModel() {
     private val _isProfileComplete = mutableStateOf(false)
     val isProfileComplete: State<Boolean> = _isProfileComplete
 
+    private var profileListener: ValueEventListener? = null
+
     private val adminEmails by lazy {
         BuildConfig.ADMIN_EMAILS
             .split(",")
@@ -47,11 +52,35 @@ class AuthViewModel : ViewModel() {
     }
 
     init {
-        auth.currentUser?.uid?.let { fetchUserProfile(it) }
+        auth.currentUser?.uid?.let { 
+            fetchUserProfile(it)
+            listenToUserProfile(it)
+        }
+    }
+
+    private fun listenToUserProfile(uid: String) {
+        // Remove existing listener if any
+        profileListener?.let { database.child(uid).removeEventListener(it) }
+        
+        profileListener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val dbUser = snapshot.getValue(User::class.java)
+                if (dbUser != null) {
+                    _userProfile.value = dbUser
+                    _isProfileComplete.value = dbUser.name.isNotBlank() && dbUser.age.isNotBlank()
+                    syncRoleFlags()
+                }
+            }
+            override fun onCancelled(error: DatabaseError) {
+                android.util.Log.e("AuthViewModel", "Profile listener cancelled: ${error.message}")
+            }
+        }
+        database.child(uid).addValueEventListener(profileListener!!)
     }
 
     fun login(email: String, pass: String, onSuccess: () -> Unit) {
-        if (email.isBlank() || pass.isBlank()) {
+        val trimmedEmail = email.trim()
+        if (trimmedEmail.isBlank() || pass.isBlank()) {
             _error.value = "❌ Please enter email and password"
             return
         }
@@ -59,7 +88,7 @@ class AuthViewModel : ViewModel() {
         _error.value = null
 
         try {
-            auth.signInWithEmailAndPassword(email, pass)
+            auth.signInWithEmailAndPassword(trimmedEmail, pass)
                 .addOnCompleteListener { task ->
                     if (task.isSuccessful) {
                         val firebaseUser = task.result.user
@@ -73,6 +102,7 @@ class AuthViewModel : ViewModel() {
                             authProvider = "email"
                         )
                         fetchUserProfile(uid) {
+                            listenToUserProfile(uid)
                             _isLoading.value = false
                             _isLoggedIn.value = true
                             syncRoleFlags()
@@ -121,24 +151,28 @@ class AuthViewModel : ViewModel() {
         pass: String,
         onSuccess: () -> Unit
     ) {
-        if (name.isBlank() || email.isBlank() || age.isBlank() || phone.isBlank() || gender.isBlank() || pass.isBlank()) {
+        val trimmedName = name.trim()
+        val trimmedEmail = email.trim()
+        val trimmedPhone = phone.trim()
+        
+        if (trimmedName.isBlank() || trimmedEmail.isBlank() || age.isBlank() || trimmedPhone.isBlank() || gender.isBlank() || pass.isBlank()) {
             _error.value = "Please fill all fields"
             return
         }
         _isLoading.value = true
         _error.value = null
-        auth.createUserWithEmailAndPassword(email, pass)
+        auth.createUserWithEmailAndPassword(trimmedEmail, pass)
             .addOnCompleteListener { task ->
                 if (task.isSuccessful) {
                     val uid = task.result.user?.uid ?: ""
                     val newUser = User(
                         uid = uid,
-                        name = name,
-                        email = email,
+                        name = trimmedName,
+                        email = trimmedEmail,
                         age = age,
-                        phoneNumber = phone,
+                        phoneNumber = trimmedPhone,
                         gender = gender,
-                        role = if (isAdminEmail(email)) AuthRole.ADMIN.dbValue else AuthRole.USER.dbValue,
+                        role = if (isAdminEmail(trimmedEmail)) AuthRole.ADMIN.dbValue else AuthRole.USER.dbValue,
                         authProvider = "email"
                     )
                     database.child(uid).setValue(newUser)
@@ -147,6 +181,7 @@ class AuthViewModel : ViewModel() {
                                 _userProfile.value = newUser
                                 _isProfileComplete.value = newUser.name.isNotBlank() && newUser.age.isNotBlank()
                                 _isLoggedIn.value = true
+                                listenToUserProfile(uid)
                                 syncRoleFlags()
                                 _isLoading.value = false
                                 onSuccess()
@@ -338,6 +373,7 @@ class AuthViewModel : ViewModel() {
                                     .addOnSuccessListener {
                                         _userProfile.value = mergedUser
                                         _isProfileComplete.value = mergedUser.name.isNotBlank() && mergedUser.age.isNotBlank()
+                                        listenToUserProfile(uid)
                                         syncRoleFlags()
                                         _isLoading.value = false
                                         _isLoggedIn.value = true
@@ -440,12 +476,36 @@ class AuthViewModel : ViewModel() {
     }
 
     fun logout() {
+        val uid = auth.currentUser?.uid
+        if (uid != null && profileListener != null) {
+            database.child(uid).removeEventListener(profileListener!!)
+        }
+        profileListener = null
+
         auth.signOut()
         _isLoggedIn.value = false
         _userProfile.value = null
         _isAdmin.value = false
         _isProfileComplete.value = false
         _error.value = null
+    }
+
+    fun changePassword(newPass: String, onSuccess: () -> Unit) {
+        if (newPass.length < 6) {
+            _error.value = "❌ Password must be at least 6 characters"
+            return
+        }
+        _isLoading.value = true
+        _error.value = null
+        auth.currentUser?.updatePassword(newPass)
+            ?.addOnCompleteListener { task ->
+                _isLoading.value = false
+                if (task.isSuccessful) {
+                    onSuccess()
+                } else {
+                    _error.value = task.exception?.message ?: "❌ Password update failed"
+                }
+            }
     }
 
     private fun isAdminEmail(email: String?): Boolean {
