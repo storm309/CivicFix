@@ -254,109 +254,96 @@ fun HomeScreen(
                 }
             }
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp)
-                    .padding(top = 20.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
+            // Body Content
+            Column(modifier = Modifier.padding(bottom = 24.dp)) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp)
+                        .padding(top = 20.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    if (!authViewModel.isAdmin.value) {
+                        StatCard(stringResource(R.string.filter_all), "🗂️", EcoGreen40, modifier = Modifier.weight(1f), onClick = onViewReports)
+                        StatCard(stringResource(R.string.filter_pending), "⏳", MaterialTheme.colorScheme.tertiary, modifier = Modifier.weight(1f), onClick = onViewReports)
+                        StatCard(stringResource(R.string.filter_approved), "✅", Teal40, modifier = Modifier.weight(1f), onClick = onViewReports)
+                    }
+                }
+
+                Spacer(Modifier.height(24.dp))
+
+                Text(
+                    text     = stringResource(R.string.quick_actions),
+                    style    = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.padding(horizontal = 20.dp),
+                    color    = MaterialTheme.colorScheme.onBackground
+                )
+
+                Spacer(Modifier.height(14.dp))
+
+                // Normal user actions
                 if (!authViewModel.isAdmin.value) {
-                    StatCard(stringResource(R.string.filter_all), "🗂️", EcoGreen40, modifier = Modifier.weight(1f), onClick = onViewReports)
-                    StatCard(stringResource(R.string.filter_pending), "⏳", MaterialTheme.colorScheme.tertiary, modifier = Modifier.weight(1f), onClick = onViewReports)
-                    StatCard(stringResource(R.string.filter_approved), "✅", Teal40, modifier = Modifier.weight(1f), onClick = onViewReports)
+                    AnimatedVisibility(
+                        visible = visible,
+                        enter   = fadeIn(tween(300)) + slideInVertically(tween(300)) { it / 2 }
+                    ) {
+                        ActionCard(
+                            title    = stringResource(R.string.report_waste),
+                            subtitle = stringResource(R.string.snap_photo_report),
+                            icon     = Icons.Default.Add,
+                            gradient = Brush.linearGradient(listOf(EcoGreen40, EcoGreen60)),
+                            onClick  = onReportWaste,
+                            modifier = Modifier.padding(horizontal = 20.dp)
+                        )
+                    }
+                    Spacer(Modifier.height(14.dp))
                 }
-            }
 
-            Spacer(Modifier.height(24.dp))
-
-            Text(
-                text     = stringResource(R.string.quick_actions),
-                style    = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(horizontal = 20.dp),
-                color    = MaterialTheme.colorScheme.onBackground
-            )
-
-            Spacer(Modifier.height(14.dp))
-
-            if (authViewModel.isAdmin.value) {
                 AnimatedVisibility(
                     visible = visible,
-                    enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { -it / 2 }
+                    enter   = fadeIn(tween(300, delayMillis = 120)) +
+                              slideInVertically(tween(300, delayMillis = 120)) { it / 2 }
                 ) {
                     ActionCard(
-                        title = stringResource(R.string.admin_console),
-                        subtitle = stringResource(R.string.pending_queue),
-                        icon = Icons.Default.Dashboard,
-                        gradient = Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)),
-                        onClick = onAdminDashboard,
+                        title    = stringResource(R.string.view_reports),
+                        subtitle = stringResource(R.string.track_submitted_reports),
+                        icon     = Icons.AutoMirrored.Filled.List,
+                        gradient = Brush.linearGradient(listOf(Teal40, Color(0xFF00BFA5))),
+                        onClick  = onViewReports,
                         modifier = Modifier.padding(horizontal = 20.dp)
                     )
                 }
                 Spacer(Modifier.height(14.dp))
-            }
 
-            if (!authViewModel.isAdmin.value) {
                 AnimatedVisibility(
                     visible = visible,
-                    enter   = fadeIn(tween(300)) + slideInVertically(tween(300)) { it / 2 }
+                    enter   = fadeIn(tween(300, delayMillis = 240)) +
+                              slideInVertically(tween(300, delayMillis = 240)) { it / 2 }
                 ) {
                     ActionCard(
-                        title    = stringResource(R.string.report_waste),
-                        subtitle = stringResource(R.string.snap_photo_report),
-                        icon     = Icons.Default.Add,
-                        gradient = Brush.linearGradient(listOf(EcoGreen40, EcoGreen60)),
-                        onClick  = onReportWaste,
+                        title    = stringResource(R.string.view_map),
+                        subtitle = stringResource(R.string.locate_waste),
+                        icon     = Icons.Default.Map,
+                        gradient = Brush.linearGradient(listOf(Color(0xFF1565C0), Color(0xFF42A5F5))),
+                        onClick  = onViewMap,
                         modifier = Modifier.padding(horizontal = 20.dp)
                     )
                 }
                 Spacer(Modifier.height(14.dp))
-            }
 
-            AnimatedVisibility(
-                visible = visible,
-                enter   = fadeIn(tween(300, delayMillis = 120)) +
-                          slideInVertically(tween(300, delayMillis = 120)) { it / 2 }
-            ) {
-                ActionCard(
-                    title    = stringResource(R.string.view_reports),
-                    subtitle = stringResource(R.string.track_submitted_reports),
-                    icon     = Icons.AutoMirrored.Filled.List,
-                    gradient = Brush.linearGradient(listOf(Teal40, Color(0xFF00BFA5))),
-                    onClick  = onViewReports,
-                    modifier = Modifier.padding(horizontal = 20.dp)
-                )
-            }
-            Spacer(Modifier.height(14.dp))
-
-            AnimatedVisibility(
-                visible = visible,
-                enter   = fadeIn(tween(300, delayMillis = 240)) +
-                          slideInVertically(tween(300, delayMillis = 240)) { it / 2 }
-            ) {
-                ActionCard(
-                    title    = stringResource(R.string.view_map),
-                    subtitle = stringResource(R.string.locate_waste),
-                    icon     = Icons.Default.Map,
-                    gradient = Brush.linearGradient(listOf(Color(0xFF1565C0), Color(0xFF42A5F5))),
-                    onClick  = onViewMap,
-                    modifier = Modifier.padding(horizontal = 20.dp)
-                )
-            }
-            Spacer(Modifier.height(14.dp))
-
-            AnimatedVisibility(
-                visible = visible,
-                enter   = fadeIn(tween(300, delayMillis = 300))
-            ) {
-                ActionCard(
-                    title    = stringResource(R.string.my_profile),
-                    subtitle = stringResource(R.string.manage_profile),
-                    icon = Icons.Default.AccountCircle,
-                    gradient = Brush.linearGradient(listOf(Color(0xFF6A1B9A), Color(0xFFAB47BC))),
-                    onClick  = onEditProfile,
-                    modifier = Modifier.padding(horizontal = 20.dp)
-                )
+                AnimatedVisibility(
+                    visible = visible,
+                    enter   = fadeIn(tween(300, delayMillis = 300))
+                ) {
+                    ActionCard(
+                        title    = stringResource(R.string.my_profile),
+                        subtitle = stringResource(R.string.manage_profile),
+                        icon = Icons.Default.AccountCircle,
+                        gradient = Brush.linearGradient(listOf(Color(0xFF6A1B9A), Color(0xFFAB47BC))),
+                        onClick  = onEditProfile,
+                        modifier = Modifier.padding(horizontal = 20.dp)
+                    )
+                }
             }
             Spacer(Modifier.height(14.dp))
 

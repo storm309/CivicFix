@@ -78,7 +78,8 @@ class MainActivity : AppCompatActivity() {
                             viewModel = authViewModel,
                             isEditMode = false,
                             onComplete = {
-                                navController.navigate(Screen.Home.route) { popUpTo(0) }
+                                val dest = if (authViewModel.isAdmin.value) Screen.AdminDashboard.route else Screen.Home.route
+                                navController.navigate(dest) { popUpTo(0) }
                             }
                         )
                     }
@@ -90,6 +91,14 @@ class MainActivity : AppCompatActivity() {
                         )
                     }
                     composable(Screen.Home.route) {
+                        if (authViewModel.isAdmin.value) {
+                            LaunchedEffect(Unit) {
+                                navController.navigate(Screen.AdminDashboard.route) {
+                                    popUpTo(Screen.Home.route) { inclusive = true }
+                                }
+                            }
+                            return@composable
+                        }
                         HomeScreen(
                             onReportWaste = { navController.navigate(Screen.ReportWaste.route) },
                             onViewReports = { navController.navigate(Screen.ViewReports.route) },

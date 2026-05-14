@@ -1,5 +1,6 @@
 package com.example.smartwastemanagementapp.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
@@ -47,6 +48,28 @@ fun AdminDashboardScreen(
     val isLoading by viewModel.isLoading
     val userProfile by authViewModel.userProfile
     val context = LocalContext.current
+    var showExitDialog by remember { mutableStateOf(false) }
+
+    BackHandler {
+        showExitDialog = true
+    }
+
+    if (showExitDialog) {
+        AlertDialog(
+            onDismissRequest = { showExitDialog = false },
+            title = { Text("Exit admin panel?") },
+            text = { Text("You are in the admin console. Do you want to logout?") },
+            confirmButton = {
+                Button(onClick = {
+                    showExitDialog = false
+                    onLogout()
+                }) { Text("Logout") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showExitDialog = false }) { Text("Stay") }
+            }
+        )
+    }
 
     val approvedCount = remember(reports) { 
         reports.count { com.example.smartwastemanagementapp.model.ReportModerationStatus.from(it.moderationStatus) == com.example.smartwastemanagementapp.model.ReportModerationStatus.APPROVED } 
@@ -61,7 +84,11 @@ fun AdminDashboardScreen(
                 title = {
                     Column {
                         Text(stringResource(R.string.admin_console), fontWeight = FontWeight.ExtraBold)
-                        Text(stringResource(R.string.logged_in_as, userProfile?.name ?: ""), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                        Text(
+                            text = "Moderator: ${userProfile?.name ?: "Admin"}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
                     }
                 },
                 actions = {
@@ -76,6 +103,31 @@ fun AdminDashboardScreen(
         }
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(padding)) {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+            ) {
+                Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier.size(46.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Shield, null, tint = Color.White)
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Admin Control Center", fontWeight = FontWeight.Bold)
+                        Text("Review & approve citizen reports", style = MaterialTheme.typography.bodySmall)
+                    }
+                    OutlinedButton(onClick = { viewModel.fetchPendingReports() }) {
+                        Icon(Icons.Default.Refresh, null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Sync")
+                    }
+                }
+            }
+
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 AdminStatCard(stringResource(R.string.filter_pending), pending.size.toString(), Icons.Default.HourglassEmpty, MaterialTheme.colorScheme.tertiary, Modifier.weight(1f))
                 AdminStatCard(stringResource(R.string.filter_approved), approvedCount.toString(), Icons.Default.CheckCircle, EcoGreen40, Modifier.weight(1f))
@@ -94,8 +146,7 @@ fun AdminDashboardScreen(
             }
 
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(R.string.pending_queue), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                TextButton(onClick = onBackToHome) { Icon(Icons.Default.Person, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text(stringResource(R.string.user_view)) }
+                Text("Pending Review Queue", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             }
 
             if (isLoading && pending.isEmpty()) {

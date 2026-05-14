@@ -61,13 +61,14 @@ class AuthViewModel : ViewModel() {
     private fun listenToUserProfile(uid: String) {
         // Remove existing listener if any
         profileListener?.let { database.child(uid).removeEventListener(it) }
-        
+
         profileListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val dbUser = snapshot.getValue(User::class.java)
                 if (dbUser != null) {
-                    _userProfile.value = dbUser
-                    _isProfileComplete.value = dbUser.name.isNotBlank() && dbUser.age.isNotBlank()
+                    val enforcedUser = enforceAdminRole(dbUser)
+                    _userProfile.value = enforcedUser
+                    _isProfileComplete.value = enforcedUser.name.isNotBlank() && enforcedUser.age.isNotBlank()
                     syncRoleFlags()
                 }
             }
@@ -202,8 +203,9 @@ class AuthViewModel : ViewModel() {
             .addOnSuccessListener { snapshot ->
                 val dbUser = snapshot.getValue(User::class.java)
                 if (dbUser != null) {
-                    _userProfile.value = dbUser
-                    _isProfileComplete.value = dbUser.name.isNotBlank() && dbUser.age.isNotBlank()
+                    val enforcedUser = enforceAdminRole(dbUser)
+                    _userProfile.value = enforcedUser
+                    _isProfileComplete.value = enforcedUser.name.isNotBlank() && enforcedUser.age.isNotBlank()
                 } else {
                     val current = _userProfile.value
                     if (current != null && current.uid == uid) {
@@ -220,6 +222,17 @@ class AuthViewModel : ViewModel() {
                 _isProfileComplete.value = false
                 onDone()
             }
+    }
+
+    private fun enforceAdminRole(user: User): User {
+        val shouldBeAdmin = isAdminEmail(user.email)
+        val isAlreadyAdmin = user.role.equals(AuthRole.ADMIN.dbValue, ignoreCase = true)
+        if (shouldBeAdmin && !isAlreadyAdmin) {
+            val updated = user.copy(role = AuthRole.ADMIN.dbValue)
+            database.child(user.uid).child("role").setValue(AuthRole.ADMIN.dbValue)
+            return updated
+        }
+        return user
     }
 
     fun updateProfile(name: String, age: String, gender: String, phoneNumber: String = "", onSuccess: () -> Unit) {

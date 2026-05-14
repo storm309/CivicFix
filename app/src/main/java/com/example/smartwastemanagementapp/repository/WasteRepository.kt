@@ -35,24 +35,15 @@ class WasteRepository {
         android.util.Log.d("WasteRepository", "User ID: $userId")
         android.util.Log.d("WasteRepository", "Location: ($latitude, $longitude)")
 
-        // Upload image if provided
+        // Using Base64 to bypass Firebase Storage limitations
         val imageUrl = if (imageBytes != null && imageBytes.isNotEmpty()) {
             try {
-                val fileName = "waste_${System.currentTimeMillis()}_${UUID.randomUUID().toString().take(5)}.jpg"
-                val imageRef = storage.reference.child("waste_images/$fileName")
-
-                android.util.Log.d("WasteRepository", "Uploading image: $fileName to ${imageRef.path}")
-                imageRef.putBytes(imageBytes).await()
-                
-                // Get the long HTTPS URL
-                val url = imageRef.downloadUrl.await().toString()
-
-                android.util.Log.d("WasteRepository", "✓ Image uploaded successfully. URL: $url")
-                url
+                // Compress bytes further to fit in Realtime DB if necessary
+                val base64Image = "data:image/jpeg;base64," + android.util.Base64.encodeToString(imageBytes, android.util.Base64.DEFAULT)
+                android.util.Log.d("WasteRepository", "✓ Image converted to Base64")
+                base64Image
             } catch (imgError: Exception) {
-                android.util.Log.e("WasteRepository", "✗ Image upload failed: ${imgError.message}")
-                android.util.Log.e("WasteRepository", "Full error: ${imgError.stackTraceToString()}")
-                // Return empty string but log error clearly
+                android.util.Log.e("WasteRepository", "✗ Image conversion failed: ${imgError.message}")
                 ""
             }
         } else {
