@@ -80,11 +80,13 @@ fun HomeScreen(
                         // Logout from Firebase first
                         authViewModel.logout()
                         
-                        // Also logout from Google to ensure the account picker shows up next time
+                        // Also logout and revoke access from Google to ensure the account picker shows up next time
                         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN).build()
                         val googleSignInClient = GoogleSignIn.getClient(context, gso)
                         googleSignInClient.signOut().addOnCompleteListener {
-                            onLogout()
+                            googleSignInClient.revokeAccess().addOnCompleteListener {
+                                onLogout()
+                            }
                         }
                     },
                     colors  = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)

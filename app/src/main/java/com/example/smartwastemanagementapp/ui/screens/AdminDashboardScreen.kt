@@ -35,6 +35,9 @@ import com.example.smartwastemanagementapp.ui.theme.*
 import com.example.smartwastemanagementapp.viewmodel.WasteViewModel
 import com.example.smartwastemanagementapp.util.LanguageManager
 
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AdminDashboardScreen(
@@ -61,7 +64,17 @@ fun AdminDashboardScreen(
             confirmButton = {
                 Button(onClick = {
                     showExitDialog = false
-                    onLogout()
+                    // Logout from Firebase
+                    authViewModel.logout()
+                    
+                    // Also logout and revoke access from Google
+                    val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN).build()
+                    val googleSignInClient = GoogleSignIn.getClient(context, gso)
+                    googleSignInClient.signOut().addOnCompleteListener {
+                        googleSignInClient.revokeAccess().addOnCompleteListener {
+                            onLogout()
+                        }
+                    }
                 }) { Text("Logout") }
             },
             dismissButton = {
@@ -96,7 +109,19 @@ fun AdminDashboardScreen(
                         Icon(Icons.Default.Language, null, tint = MaterialTheme.colorScheme.primary)
                     }
                     IconButton(onClick = { viewModel.fetchPendingReports() }) { Icon(Icons.Default.Refresh, null) }
-                    IconButton(onClick = onLogout) { Icon(Icons.AutoMirrored.Filled.ExitToApp, null, tint = MaterialTheme.colorScheme.error) }
+                    IconButton(onClick = {
+                        // Logout from Firebase
+                        authViewModel.logout()
+                        
+                        // Also logout and revoke access from Google
+                        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN).build()
+                        val googleSignInClient = GoogleSignIn.getClient(context, gso)
+                        googleSignInClient.signOut().addOnCompleteListener {
+                            googleSignInClient.revokeAccess().addOnCompleteListener {
+                                onLogout()
+                            }
+                        }
+                    }) { Icon(Icons.AutoMirrored.Filled.ExitToApp, null, tint = MaterialTheme.colorScheme.error) }
                 }
             )
         }
