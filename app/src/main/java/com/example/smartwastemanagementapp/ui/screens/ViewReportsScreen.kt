@@ -25,6 +25,7 @@ import com.example.smartwastemanagementapp.model.ReportModerationStatus
 import com.example.smartwastemanagementapp.model.WasteReport
 import com.example.smartwastemanagementapp.util.LanguageManager
 import com.example.smartwastemanagementapp.viewmodel.WasteViewModel
+import com.example.smartwastemanagementapp.ui.components.ReportImage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -110,7 +111,12 @@ private fun ReportCard(report: WasteReport, onUpvote: () -> Unit) {
     Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), elevation = CardDefaults.cardElevation(2.dp)) {
         Column {
             if (report.imageUrl.isNotBlank()) {
-                Image(painter = rememberAsyncImagePainter(report.imageUrl), contentDescription = null, modifier = Modifier.fillMaxWidth().height(180.dp), contentScale = ContentScale.Crop)
+                ReportImage(
+                    imageUrl = report.imageUrl,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxWidth().height(180.dp),
+                    contentScale = ContentScale.Crop
+                )
             }
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(text = displayDescription.ifBlank { stringResource(R.string.no_reports_yet) }, fontWeight = FontWeight.Bold)

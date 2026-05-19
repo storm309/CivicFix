@@ -309,6 +309,22 @@ fun ReportWasteScreen(
                 }
             }
 
+            if (errorMsg != null) {
+                Spacer(Modifier.height(10.dp))
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.8f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error)
+                ) {
+                    Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Error, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(10.dp))
+                        Text(errorMsg!!, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onErrorContainer)
+                    }
+                }
+            }
+
             Spacer(Modifier.height(20.dp))
             SectionHeader("2", stringResource(R.string.step_desc_title), stringResource(R.string.step_desc_desc))
             Spacer(Modifier.height(10.dp))
@@ -362,6 +378,8 @@ fun ReportWasteScreen(
             if (isLoading) {
                 CircularProgressIndicator()
             } else {
+                val canSubmit = description.isNotBlank() && location != null && isUserAuthenticated() && (imageUri == null || moderationResult != null)
+                
                 Button(
                     onClick = {
                         if (!isUserAuthenticated()) return@Button
@@ -371,11 +389,16 @@ fun ReportWasteScreen(
                     },
                     modifier = Modifier.fillMaxWidth().height(56.dp),
                     shape = RoundedCornerShape(16.dp),
-                    enabled = description.isNotBlank() && location != null && isUserAuthenticated()
+                    enabled = canSubmit
                 ) {
                     Icon(Icons.AutoMirrored.Filled.Send, null)
                     Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.submit_report), fontWeight = FontWeight.Bold)
+                    Text(
+                        text = if (!isUserAuthenticated()) "Login to Submit" 
+                               else if (imageUri != null && moderationResult == null) "Analyze Image First"
+                               else stringResource(R.string.submit_report), 
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
             Spacer(Modifier.height(32.dp))

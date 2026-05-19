@@ -1,9 +1,11 @@
 package com.example.smartwastemanagementapp.repository
 
+import android.graphics.BitmapFactory
 import android.net.Uri
 import com.example.smartwastemanagementapp.model.ReportModerationStatus
 import com.example.smartwastemanagementapp.model.WasteReport
 import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ServerValue
 import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.tasks.await
 import java.util.UUID
@@ -16,7 +18,40 @@ class WasteRepository {
     private val reportsRef = firebaseDb.getReference("reports")
 
     // Use default instance which automatically uses the bucket from google-services.json
-    private val storage = FirebaseStorage.getInstance()
+    private val storage = FirebaseStorage.getInstance("gs://civicfix-92e86.firebasestorage.app")
+
+    private fun compressImage(originalBytes: ByteArray): ByteArray {
+        return try {
+            val bitmap = BitmapFactory.decodeByteArray(originalBytes, 0, originalBytes.size) ?: return originalBytes
+            
+            // Resize if too large (Max 1024px on either side)
+            val maxSize = 1024
+            val (width, height) = if (bitmap.width > bitmap.height) {
+                if (bitmap.width > maxSize) {
+                    val scale = maxSize.toFloat() / bitmap.width
+                    (maxSize to (bitmap.height * scale).toInt())
+                } else (bitmap.width to bitmap.height)
+            } else {
+                if (bitmap.height > maxSize) {
+                    val scale = maxSize.toFloat() / bitmap.height
+                    ((bitmap.width * scale).toInt() to maxSize)
+                } else (bitmap.width to bitmap.height)
+            }
+
+            val resizedBitmap = if (width != bitmap.width || height != bitmap.height) {
+                android.graphics.Bitmap.createScaledBitmap(bitmap, width, height, true)
+            } else {
+                bitmap
+            }
+
+            val outputStream = java.io.ByteArrayOutputStream()
+            resizedBitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 75, outputStream)
+            outputStream.toByteArray()
+        } catch (e: Exception) {
+            android.util.Log.e("WasteRepository", "Compression failed: ${e.message}")
+            originalBytes
+        }
+    }
 
     suspend fun submitReport(
         description: String,
@@ -35,16 +70,27 @@ class WasteRepository {
         android.util.Log.d("WasteRepository", "User ID: $userId")
         android.util.Log.d("WasteRepository", "Location: ($latitude, $longitude)")
 
-        // Using Base64 to bypass Firebase Storage limitations
+        val reportId = reportsRef.push().key ?: UUID.randomUUID().toString()
+
+        // Prefer Firebase Storage for photos; fallback to Base64 if upload fails
         val imageUrl = if (imageBytes != null && imageBytes.isNotEmpty()) {
+            val processedBytes = compressImage(imageBytes)
             try {
-                // Compress bytes further to fit in Realtime DB if necessary
-                val base64Image = "data:image/jpeg;base64," + android.util.Base64.encodeToString(imageBytes, android.util.Base64.DEFAULT)
-                android.util.Log.d("WasteRepository", "✓ Image converted to Base64")
-                base64Image
-            } catch (imgError: Exception) {
-                android.util.Log.e("WasteRepository", "✗ Image conversion failed: ${imgError.message}")
-                ""
+                val imageRef = storage.reference.child("report_images/$reportId.jpg")
+                imageRef.putBytes(processedBytes).await()
+                val downloadUrl = imageRef.downloadUrl.await().toString()
+                android.util.Log.d("WasteRepository", "✓ Image uploaded to Storage: $downloadUrl")
+                downloadUrl
+            } catch (uploadError: Exception) {
+                android.util.Log.w("WasteRepository", "Storage upload failed, falling back to Base64: ${uploadError.message}")
+                try {
+                    val base64Image = "data:image/jpeg;base64," + android.util.Base64.encodeToString(processedBytes, android.util.Base64.NO_WRAP)
+                    android.util.Log.d("WasteRepository", "✓ Image converted to Base64")
+                    base64Image
+                } catch (imgError: Exception) {
+                    android.util.Log.e("WasteRepository", "✗ Image conversion failed: ${imgError.message}")
+                    ""
+                }
             }
         } else {
             android.util.Log.d("WasteRepository", "→ No image provided or bytes empty")
@@ -52,7 +98,6 @@ class WasteRepository {
         }
 
         // Create report object
-        val reportId = reportsRef.push().key ?: UUID.randomUUID().toString()
         val report = WasteReport(
             id = reportId,
             description = description,
@@ -142,10 +187,11 @@ class WasteRepository {
     suspend fun rewardUser(userId: String, points: Int): Result<Unit> = try {
         android.util.Log.d("WasteRepository", "Attempting to reward user $userId with $points points")
         val userPointsRef = firebaseDb.getReference("users").child(userId).child("impactPoints")
-        val snapshot = userPointsRef.get().await()
-        val currentPoints = snapshot.getValue(Int::class.java) ?: 0
-        userPointsRef.setValue(currentPoints + points).await()
-        android.util.Log.d("WasteRepository", "✓ Successfully rewarded user $userId. New total: ${currentPoints + points}")
+        
+        // Use ServerValue.increment for atomic updates
+        userPointsRef.setValue(ServerValue.increment(points.toLong())).await()
+        
+        android.util.Log.d("WasteRepository", "✓ Successfully triggered atomic reward for user $userId")
         Result.success(Unit)
     } catch (e: Exception) {
         android.util.Log.e("WasteRepository", "✗ Failed to reward user $userId: ${e.message}")
@@ -172,9 +218,9 @@ class WasteRepository {
         if (status == ReportModerationStatus.APPROVED) {
             android.util.Log.d("WasteRepository", "Report approved! Fetching reporter ID for $reportId")
             try {
-                // Fetch directly to avoid any parsing issues with the whole object
-                val reporterSnapshot = reportsRef.child(reportId).child("reportedBy").get().await()
-                val reporterId = reporterSnapshot.getValue(String::class.java)
+                // Fetch the report snapshot to get the reportedBy ID
+                val reportSnapshot = reportsRef.child(reportId).get().await()
+                val reporterId = reportSnapshot.child("reportedBy").getValue(String::class.java)
                 
                 android.util.Log.d("WasteRepository", "Reporter ID fetched: $reporterId")
                 
@@ -182,7 +228,7 @@ class WasteRepository {
                     android.util.Log.d("WasteRepository", "Triggering reward for $reporterId")
                     rewardUser(reporterId, 50) 
                 } else {
-                    android.util.Log.w("WasteRepository", "Could not find reporter ID for report $reportId. Snap: ${reporterSnapshot.value}")
+                    android.util.Log.w("WasteRepository", "Could not find reporter ID for report $reportId")
                 }
             } catch (e: Exception) {
                 android.util.Log.e("WasteRepository", "Error fetching reporter ID: ${e.message}")

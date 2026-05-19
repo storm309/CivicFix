@@ -29,8 +29,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.rememberAsyncImagePainter
-import coil.compose.AsyncImage
 import com.example.smartwastemanagementapp.R
+import com.example.smartwastemanagementapp.ui.components.ReportImage
 import com.example.smartwastemanagementapp.ui.theme.*
 import com.example.smartwastemanagementapp.viewmodel.WasteViewModel
 import com.example.smartwastemanagementapp.util.LanguageManager
@@ -39,7 +39,6 @@ import com.example.smartwastemanagementapp.util.LanguageManager
 @Composable
 fun AdminDashboardScreen(
     onLogout: () -> Unit,
-    onBackToHome: () -> Unit,
     viewModel: WasteViewModel,
     authViewModel: com.example.smartwastemanagementapp.viewmodel.AuthViewModel
 ) {
@@ -193,23 +192,11 @@ fun ReportAdminCard(report: com.example.smartwastemanagementapp.model.WasteRepor
             // Photo of the report - ensured to be shown
             if (report.imageUrl.isNotBlank()) {
                 Card(modifier = Modifier.fillMaxWidth().height(220.dp), shape = RoundedCornerShape(16.dp), elevation = CardDefaults.cardElevation(4.dp)) {
-                    AsyncImage(
-                        model = report.imageUrl,
+                    ReportImage(
+                        imageUrl = report.imageUrl,
                         contentDescription = stringResource(R.string.step_photo_title),
                         modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop,
-                        onState = { state ->
-                            when (state) {
-                                is coil.compose.AsyncImagePainter.State.Error -> {
-                                    android.util.Log.e("AdminDashboard", "Error loading image: ${report.imageUrl}")
-                                    android.util.Log.e("AdminDashboard", "Error cause: ${state.result.throwable.message}")
-                                }
-                                is coil.compose.AsyncImagePainter.State.Success -> {
-                                    android.util.Log.d("AdminDashboard", "Success loading image: ${report.imageUrl}")
-                                }
-                                else -> {}
-                            }
-                        }
+                        contentScale = ContentScale.Crop
                     )
                 }
                 Spacer(Modifier.height(12.dp))

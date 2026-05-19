@@ -34,12 +34,12 @@ class MainActivity : AppCompatActivity() {
                                 val isComplete = authViewModel.isProfileComplete.value
                                 
                                 if (!isLoggedIn) {
-                                    navController.navigate(Screen.Login.route) { popUpTo(0) }
+                                    navController.navigate(Screen.Login.route) { popUpTo(0) { inclusive = true } }
                                 } else if (!isComplete) {
-                                    navController.navigate(Screen.CompleteProfile.route) { popUpTo(0) }
+                                    navController.navigate(Screen.CompleteProfile.route) { popUpTo(0) { inclusive = true } }
                                 } else {
                                     val dest = if (authViewModel.isAdmin.value) Screen.AdminDashboard.route else Screen.Home.route
-                                    navController.navigate(dest) { popUpTo(0) }
+                                    navController.navigate(dest) { popUpTo(0) { inclusive = true } }
                                 }
                             }
                         )
@@ -50,12 +50,12 @@ class MainActivity : AppCompatActivity() {
                             onLoginSuccess = {
                                 if (!authViewModel.isProfileComplete.value) {
                                     navController.navigate(Screen.CompleteProfile.route) { 
-                                        popUpTo(Screen.Login.route) { inclusive = true } 
+                                        popUpTo(0) { inclusive = true } 
                                     }
                                 } else {
                                     val dest = if (authViewModel.isAdmin.value) Screen.AdminDashboard.route else Screen.Home.route
                                     navController.navigate(dest) { 
-                                        popUpTo(Screen.Login.route) { inclusive = true } 
+                                        popUpTo(0) { inclusive = true } 
                                     }
                                 }
                             },
@@ -79,7 +79,7 @@ class MainActivity : AppCompatActivity() {
                             isEditMode = false,
                             onComplete = {
                                 val dest = if (authViewModel.isAdmin.value) Screen.AdminDashboard.route else Screen.Home.route
-                                navController.navigate(dest) { popUpTo(0) }
+                                navController.navigate(dest) { popUpTo(0) { inclusive = true } }
                             }
                         )
                     }
@@ -91,10 +91,11 @@ class MainActivity : AppCompatActivity() {
                         )
                     }
                     composable(Screen.Home.route) {
+                        // STRICT REDIRECT: If admin tries to reach home, send to dashboard
                         if (authViewModel.isAdmin.value) {
                             LaunchedEffect(Unit) {
                                 navController.navigate(Screen.AdminDashboard.route) {
-                                    popUpTo(Screen.Home.route) { inclusive = true }
+                                    popUpTo(0) { inclusive = true }
                                 }
                             }
                             return@composable
@@ -108,15 +109,15 @@ class MainActivity : AppCompatActivity() {
                                 authViewModel.logout()
                                 navController.navigate(Screen.Login.route) { popUpTo(0) }
                             },
-                            onAdminDashboard = { navController.navigate(Screen.AdminDashboard.route) },
                             authViewModel = authViewModel
                         )
                     }
                     composable(Screen.AdminDashboard.route) {
+                        // STRICT REDIRECT: If normal user tries to reach dashboard, send to home
                         if (!authViewModel.isAdmin.value) {
                             LaunchedEffect(Unit) {
                                 navController.navigate(Screen.Home.route) {
-                                    popUpTo(Screen.AdminDashboard.route) { inclusive = true }
+                                    popUpTo(0) { inclusive = true }
                                 }
                             }
                             return@composable
@@ -126,11 +127,6 @@ class MainActivity : AppCompatActivity() {
                             onLogout = {
                                 authViewModel.logout()
                                 navController.navigate(Screen.Login.route) { popUpTo(0) }
-                            },
-                            onBackToHome = {
-                                navController.navigate(Screen.Home.route) {
-                                    popUpTo(Screen.AdminDashboard.route)
-                                }
                             },
                             viewModel = wasteViewModel,
                             authViewModel = authViewModel
