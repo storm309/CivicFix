@@ -25,6 +25,22 @@ class MainActivity : AppCompatActivity() {
             SmartWasteManagementAppTheme {
                 val navController = rememberNavController()
                 val authViewModel: AuthViewModel = viewModel()
+
+                // Global Navigation Redirects based on Auth State
+                val isLoggedIn = authViewModel.isLoggedIn.value
+                val isAdmin = authViewModel.isAdmin.value
+
+                LaunchedEffect(isLoggedIn, isAdmin) {
+                    if (!isLoggedIn) {
+                        navController.navigate(Screen.Login.route) {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    } else if (isAdmin) {
+                        navController.navigate(Screen.AdminDashboard.route) {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    }
+                }
                 
                 NavHost(navController = navController, startDestination = Screen.Splash.route) {
                     composable(Screen.Splash.route) {

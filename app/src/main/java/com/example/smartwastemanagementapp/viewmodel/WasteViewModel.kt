@@ -16,6 +16,7 @@ import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 data class ImageModerationResult(
@@ -58,28 +59,27 @@ class WasteViewModel(private val repository: WasteRepository = WasteRepository()
     }
 
     init {
-        fetchReports()
-        fetchPendingReports()
+        observeReports()
     }
 
-    fun fetchReports() {
+    private fun observeReports() {
         viewModelScope.launch(exceptionHandler) {
-            try {
-                _isLoading.value = true
-                _error.value = null
-                _reports.value = repository.getAllReports()
-            } catch (e: Exception) {
-                _error.value = e.localizedMessage ?: "Failed to load reports"
-            } finally {
+            repository.getReportsFlow().collectLatest { allReports ->
+                _reports.value = allReports
+                _pendingReports.value = allReports.filter {
+                    ReportModerationStatus.from(it.moderationStatus) == ReportModerationStatus.PENDING_APPROVAL
+                }
                 _isLoading.value = false
             }
         }
     }
 
+    fun fetchReports() {
+        // Redundant with real-time observation, but kept for interface compatibility if needed
+    }
+
     fun fetchPendingReports() {
-        viewModelScope.launch(exceptionHandler) {
-            _pendingReports.value = repository.getPendingModerationReports()
-        }
+        // Redundant with real-time observation
     }
 
     fun submitReport(
@@ -136,8 +136,6 @@ class WasteViewModel(private val repository: WasteRepository = WasteRepository()
                 )
                 if (result.isSuccess) {
                     onSuccess()
-                    fetchReports()
-                    fetchPendingReports()
                     _imageModeration.value = null
                     _aiDescriptionHi.value = null
                 } else {
@@ -245,7 +243,6 @@ class WasteViewModel(private val repository: WasteRepository = WasteRepository()
         val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
         viewModelScope.launch(exceptionHandler) {
             repository.upvoteReport(reportId, userId)
-            fetchReports()
         }
     }
 
@@ -261,8 +258,6 @@ class WasteViewModel(private val repository: WasteRepository = WasteRepository()
             if (result.isFailure) {
                 _error.value = result.exceptionOrNull()?.localizedMessage ?: "Approval failed"
             }
-            fetchPendingReports()
-            fetchReports()
         }
     }
 
@@ -278,8 +273,6 @@ class WasteViewModel(private val repository: WasteRepository = WasteRepository()
             if (result.isFailure) {
                 _error.value = result.exceptionOrNull()?.localizedMessage ?: "Rejection failed"
             }
-            fetchPendingReports()
-            fetchReports()
         }
     }
 

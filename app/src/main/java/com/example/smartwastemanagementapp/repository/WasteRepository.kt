@@ -4,9 +4,15 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import com.example.smartwastemanagementapp.model.ReportModerationStatus
 import com.example.smartwastemanagementapp.model.WasteReport
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ServerValue
+import com.google.firebase.database.ValueEventListener
 import com.google.firebase.storage.FirebaseStorage
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 import java.util.UUID
 
@@ -113,7 +119,8 @@ class WasteRepository {
             aiSafetyScore = aiSafetyScore,
             aiSafetyLabel = aiSafetyLabel,
             reportedBy = userId,
-            locationAddress = locationAddress
+            locationAddress = locationAddress,
+            timestamp = System.currentTimeMillis()
         )
 
         // Write to Firebase
@@ -154,6 +161,21 @@ class WasteRepository {
     } catch (e: Exception) {
         android.util.Log.w("WasteRepository", "Failed to get reports: ${e.message}")
         emptyList()
+    }
+
+    fun getReportsFlow(): Flow<List<WasteReport>> = callbackFlow {
+        val listener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val reports = snapshot.children.mapNotNull { it.getValue(WasteReport::class.java) }
+                    .sortedByDescending { it.timestamp }
+                trySend(reports)
+            }
+            override fun onCancelled(error: DatabaseError) {
+                close(error.toException())
+            }
+        }
+        reportsRef.addValueEventListener(listener)
+        awaitClose { reportsRef.removeEventListener(listener) }
     }
 
     suspend fun getPendingModerationReports(): List<WasteReport> {
