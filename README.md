@@ -183,16 +183,6 @@ Install on device
 
 ---
 
-# 📸 Screenshots
-
-> Add screenshots here
-
-| Login | Home | Report |
-|-------|------|---------|
-| Image | Image | Image |
-
----
-
 # 🎯 Future Improvements
 
 - Push Notifications
