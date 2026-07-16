@@ -99,3 +99,58 @@ app/src/main/java/com/example/smartwastemanagementapp/
 └── ui/
     ├── screens/                     # 9 @Composable screens
     └── theme/                       # Material 3 Compose theming
+
+🚀 Setup & Build
+Prerequisites
+Android Studio Hedgehog or newer
+
+Android device / emulator (API 24+)
+
+Android SDK 35
+
+Kotlin 2.0.21+
+
+Firebase & API Setup
+Create a project at Firebase Console.
+
+Enable Authentication (Email/Password, Phone, Google).
+
+Enable Realtime Database and Cloud Storage (configure rules for authenticated users).
+
+Download google-services.json and place it in the app/ directory.
+
+Create a local.properties file in the root of your project and add your API keys:
+
+Properties
+GEMINI_API_KEY=your_gemini_key_here
+MAPS_API_KEY=your_maps_key_here
+(Note: Ensure you are using the Secrets Gradle Plugin to safely inject these keys into your app without exposing them in version control.)
+
+Build Instructions
+Bash
+# Clone project
+git clone <repo-url>
+
+# Build debug APK
+./gradlew assembleDebug
+
+# Install on connected device
+./gradlew installDebug
+💡 Roadmap
+Push Notifications: Alert users when their report status changes via FCM.
+
+User Profiles: Add customizable avatars and profiles.
+
+Gamification: Achievement badges for reporting and cleaning.
+
+Social Features: Comments, discussions, and upvoting on reports.
+
+Advanced Mapping: Heat maps for high-waste areas and geofencing alerts.
+
+📜 License
+This project is built for civic engagement. Feel free to explore, modify, and contribute!
+
+👨‍💻 Developer
+Built with ❤️ by Shivam Pandey
+
+Making cities cleaner, one report at a time. 🌍💚
